@@ -1,0 +1,56 @@
+# Setup Claude CLI in WSL2
+
+## Installation Steps
+
+Run these commands in WSL2:
+
+```bash
+# 1. Install Claude CLI
+npm install -g @anthropic-ai/claude-cli
+
+# OR if that doesn't work, try:
+curl -fsSL https://console.anthropic.com/install.sh | sh
+
+# OR manual installation:
+wget https://github.com/anthropics/claude-cli/releases/latest/download/claude-linux-x64
+chmod +x claude-linux-x64
+sudo mv claude-linux-x64 /usr/local/bin/claude
+```
+
+## After Installation
+
+1. Authenticate (if needed):
+```bash
+claude auth login
+```
+
+2. Navigate to project:
+```bash
+cd ~/Projects/NiroAgent/na-agents
+```
+
+3. Start Claude:
+```bash
+claude
+```
+
+4. Give the prompt from WSL_PROMPT.md
+
+## Alternative: Use Claude Code directly in WSL
+
+If claude CLI isn't available, you can also use:
+
+```bash
+# Option 1: Use npx
+npx @anthropic-ai/claude
+
+# Option 2: Use the API directly with curl
+# (would need to set up API key)
+```
+
+## Simplest Alternative: Continue here
+
+If you can't get Claude CLI in WSL, just tell me:
+"Continue working on the agent tasks in the WSL directory at ~/Projects/NiroAgent/na-agents"
+
+And I can work with the files directly from here since WSL filesystem is accessible from Windows at \\wsl$\Ubuntu\home\[username]\Projects\NiroAgent\na-agents
