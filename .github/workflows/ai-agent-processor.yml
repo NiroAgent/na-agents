@@ -1,10 +1,11 @@
-name: AI Agent Issue Processor
+name: AI Agent Issue Processor (DISABLED)
 
 on:
-  issues:
-    types: [opened, reopened, edited, labeled, unlabeled]
-  issue_comment:
-    types: [created, edited]
+  # Disabled until deployment is complete
+  # issues:
+  #   types: [opened, reopened, edited, labeled, unlabeled]
+  # issue_comment:
+  #   types: [created, edited]
 
 permissions:
   issues: write
