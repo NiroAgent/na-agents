@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DNS Configuration for NA-Agents Multi-Environment Setup'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, stg, prd]
+    Description: Environment name (dev, stg, prd)
+  
+  DomainName:
+    Type: String
+    Default: visualforge.ai
+    Description: Base domain name
+  
+  LoadBalancerDNS:
+    Type: String
+    Description: Load balancer DNS name from main infrastructure stack
+  
+  LoadBalancerHostedZoneId:
+    Type: String
+    Description: Load balancer hosted zone ID for alias records
+  
+  CreateHostedZone:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Whether to create the hosted zone (only for first deployment)
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prd]
+  IsDevelopment: !Equals [!Ref Environment, dev]
+  IsStaging: !Equals [!Ref Environment, stg]
+  ShouldCreateHostedZone: !Equals [!Ref CreateHostedZone, 'true']
+
+Resources:
+  # Hosted Zone (only create if specified)
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: ShouldCreateHostedZone
+    Properties:
+      Name: !Ref DomainName
+      HostedZoneConfig:
+        Comment: !Sub 'DNS zone for ${DomainName} - managed by CloudFormation'
+      HostedZoneTags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: NA-Agents
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # Main agents subdomain record
+  AgentsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub '${DomainName}.'
+      Name: !If
+        - IsProduction
+        - !Sub 'agents.${DomainName}'
+        - !Sub 'agents.${Environment}.${DomainName}'
+      Type: A
+      AliasTarget:
+        DNSName: !Ref LoadBalancerDNS
+        HostedZoneId: !Ref LoadBalancerHostedZoneId
+        EvaluateTargetHealth: true
+      Comment: !Sub 'NA-Agents ${Environment} environment load balancer alias'
+
+  # Wildcard record for agent services (*.agents.env.domain.com)
+  AgentsWildcardRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub '${DomainName}.'
+      Name: !If
+        - IsProduction
+        - !Sub '*.agents.${DomainName}'
+        - !Sub '*.agents.${Environment}.${DomainName}'
+      Type: A
+      AliasTarget:
+        DNSName: !Ref LoadBalancerDNS
+        HostedZoneId: !Ref LoadBalancerHostedZoneId
+        EvaluateTargetHealth: true
+      Comment: !Sub 'NA-Agents ${Environment} wildcard for individual agent services'
+
+  # Health check for production environment
+  HealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Condition: IsProduction
+    Properties:
+      Type: HTTPS
+      ResourcePath: /health
+      FullyQualifiedDomainName: !Sub 'agents.${DomainName}'
+      Port: 443
+      RequestInterval: 30
+      FailureThreshold: 3
+      Tags:
+        - Key: Name
+          Value: !Sub 'NA-Agents-${Environment}-HealthCheck'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Certificate for the agents subdomain
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !If
+        - IsProduction
+        - !Sub 'agents.${DomainName}'
+        - !Sub 'agents.${Environment}.${DomainName}'
+      SubjectAlternativeNames:
+        - !If
+          - IsProduction
+          - !Sub '*.agents.${DomainName}'
+          - !Sub '*.agents.${Environment}.${DomainName}'
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !If
+            - IsProduction
+            - !Sub 'agents.${DomainName}'
+            - !Sub 'agents.${Environment}.${DomainName}'
+          HostedZoneId: !If [ShouldCreateHostedZone, !Ref HostedZone, !Ref 'AWS::NoValue']
+      Tags:
+        - Key: Name
+          Value: !Sub 'NA-Agents-${Environment}-Certificate'
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  AgentsDomainName:
+    Description: Full domain name for NA-Agents
+    Value: !If
+      - IsProduction
+      - !Sub 'agents.${DomainName}'
+      - !Sub 'agents.${Environment}.${DomainName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-AgentsDomainName'
+
+  AgentsWildcardDomainName:
+    Description: Wildcard domain name for individual agents
+    Value: !If
+      - IsProduction
+      - !Sub '*.agents.${DomainName}'
+      - !Sub '*.agents.${Environment}.${DomainName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-AgentsWildcardDomainName'
+
+  SSLCertificateArn:
+    Description: ARN of the SSL certificate for agents domain
+    Value: !Ref SSLCertificate
+    Export:
+      Name: !Sub '${AWS::StackName}-SSLCertificateArn'
+
+  HostedZoneId:
+    Description: Hosted Zone ID (if created)
+    Condition: ShouldCreateHostedZone
+    Value: !Ref HostedZone
+    Export:
+      Name: !Sub '${AWS::StackName}-HostedZoneId'
+
+  HealthCheckId:
+    Description: Route53 Health Check ID for production
+    Condition: IsProduction
+    Value: !Ref HealthCheck
+    Export:
+      Name: !Sub '${AWS::StackName}-HealthCheckId'

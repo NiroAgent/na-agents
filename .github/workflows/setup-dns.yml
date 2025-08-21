@@ -1,0 +1,136 @@
+name: Setup DNS Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to setup DNS for'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - stg
+          - prd
+      domain_name:
+        description: 'Base domain name'
+        required: true
+        default: 'visualforge.ai'
+        type: string
+      create_hosted_zone:
+        description: 'Create hosted zone (only for first time setup)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  setup-dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set environment-specific AWS Account ID
+        id: set-account
+        run: |
+          case "${{ inputs.environment }}" in
+            "dev")
+              echo "aws_account_id=${{ vars.AWS_ACCOUNT_ID_DEV }}" >> $GITHUB_OUTPUT
+              ;;
+            "stg")
+              echo "aws_account_id=${{ vars.AWS_ACCOUNT_ID_STG }}" >> $GITHUB_OUTPUT
+              ;;
+            "prd")
+              echo "aws_account_id=${{ vars.AWS_ACCOUNT_ID_PRD }}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "❌ Invalid environment: ${{ inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Setup DNS Infrastructure
+        run: |
+          # Make script executable
+          chmod +x scripts/setup-dns.sh
+          
+          # Export account ID for the script
+          export AWS_ACCOUNT_ID=${{ steps.set-account.outputs.aws_account_id }}
+          
+          # Run DNS setup
+          ./scripts/setup-dns.sh \
+            "${{ inputs.environment }}" \
+            "${{ inputs.domain_name }}" \
+            "${{ inputs.create_hosted_zone }}"
+
+      - name: Upload DNS configuration
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dns-config-${{ inputs.environment }}
+          path: dns-config-${{ inputs.environment }}.json
+          retention-days: 30
+
+      - name: Test DNS Resolution
+        run: |
+          echo "🔍 Testing DNS resolution..."
+          
+          # Determine the expected domain based on environment
+          if [ "${{ inputs.environment }}" = "prd" ]; then
+            EXPECTED_DOMAIN="agents.${{ inputs.domain_name }}"
+          else
+            EXPECTED_DOMAIN="agents.${{ inputs.environment }}.${{ inputs.domain_name }}"
+          fi
+          
+          echo "Expected domain: $EXPECTED_DOMAIN"
+          
+          # Wait a bit for DNS propagation
+          echo "⏳ Waiting 30 seconds for initial DNS propagation..."
+          sleep 30
+          
+          # Test DNS resolution with timeout
+          if timeout 10 nslookup $EXPECTED_DOMAIN; then
+            echo "✅ DNS resolution successful"
+          else
+            echo "⚠️ DNS not yet propagated (this is normal and may take up to 10 minutes)"
+          fi
+          
+          # Test with dig if available
+          if command -v dig >/dev/null 2>&1; then
+            echo "🔍 DNS details:"
+            dig $EXPECTED_DOMAIN || echo "dig failed (expected during propagation)"
+          fi
+
+      - name: Generate deployment summary
+        run: |
+          echo "## 🌐 DNS Setup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Domain:** ${{ inputs.domain_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Created Hosted Zone:** ${{ inputs.create_hosted_zone }}" >> $GITHUB_STEP_SUMMARY
+          echo "**AWS Account:** ${{ steps.set-account.outputs.aws_account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ inputs.environment }}" = "prd" ]; then
+            AGENTS_DOMAIN="agents.${{ inputs.domain_name }}"
+          else
+            AGENTS_DOMAIN="agents.${{ inputs.environment }}.${{ inputs.domain_name }}"
+          fi
+          
+          echo "**Agents Domain:** $AGENTS_DOMAIN" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait 5-10 minutes for DNS propagation" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test DNS: \`nslookup $AGENTS_DOMAIN\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Test HTTPS: \`curl https://$AGENTS_DOMAIN/health\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Run regression tests: \`npm run test:regression:${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY

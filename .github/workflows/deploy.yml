@@ -192,13 +192,18 @@ jobs:
         run: |
           # Make deployment script executable
           chmod +x deploy-to-aws.sh
+          chmod +x scripts/setup-dns.sh
           
           # Set environment variables
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_DEV }}
           export IMAGE_TAG=${{ github.sha }}
           
-          # Run deployment
+          # Run main infrastructure deployment
           ./deploy-to-aws.sh dev
+          
+          # Deploy DNS configuration
+          echo "🌐 Setting up DNS configuration for dev environment..."
+          ./scripts/setup-dns.sh dev visualforge.ai false
           
           # Get load balancer URL
           LB_URL=$(aws cloudformation describe-stacks \
@@ -308,9 +313,16 @@ jobs:
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
+          chmod +x scripts/setup-dns.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_STG }}
           export IMAGE_TAG=${{ github.sha }}
+          
+          # Run main infrastructure deployment
           ./deploy-to-aws.sh stg
+          
+          # Deploy DNS configuration
+          echo "🌐 Setting up DNS configuration for stg environment..."
+          ./scripts/setup-dns.sh stg visualforge.ai false
           
           LB_URL=$(aws cloudformation describe-stacks \
             --stack-name na-agents-stg \
@@ -366,9 +378,16 @@ jobs:
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
+          chmod +x scripts/setup-dns.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_PRD }}
           export IMAGE_TAG=${{ github.sha }}
+          
+          # Run main infrastructure deployment
           ./deploy-to-aws.sh prd
+          
+          # Deploy DNS configuration
+          echo "🌐 Setting up DNS configuration for prd environment..."
+          ./scripts/setup-dns.sh prd visualforge.ai false
           
           LB_URL=$(aws cloudformation describe-stacks \
             --stack-name na-agents-prd \
