@@ -5,7 +5,7 @@
 
 set -e  # Exit on any error
 
-ENVIRONMENT=${1:-vf-dev}
+ENVIRONMENT=${1:-dev}
 REGION=${AWS_REGION:-us-east-1}
 STACK_NAME="na-agents-${ENVIRONMENT}"
 ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
@@ -18,8 +18,8 @@ echo "🏷️  Image Tag: ${IMAGE_TAG}"
 echo ""
 
 # Validate environment
-if [[ ! "${ENVIRONMENT}" =~ ^(vf-dev|vf-stg)$ ]]; then
-    echo "❌ Error: Environment must be 'vf-dev' or 'vf-stg'"
+if [[ ! "${ENVIRONMENT}" =~ ^(dev|stg|prd)$ ]]; then
+    echo "❌ Error: Environment must be 'dev', 'stg', or 'prd'"
     exit 1
 fi
 

@@ -17,12 +17,12 @@ on:
       environment:
         description: 'Deployment environment'
         required: true
-        default: 'vf-dev'
+        default: 'dev'
         type: choice
         options:
-          - vf-dev
-          - vf-stg
-          - production
+          - dev
+          - stg
+          - prd
       force_deploy:
         description: 'Force deployment even if tests fail'
         required: false
@@ -169,14 +169,14 @@ jobs:
         with:
           sarif_file: 'trivy-image-results.sarif'
 
-  # Deploy to vf-dev (automatic on develop/main branch)
+  # Deploy to dev (automatic on develop/main branch)
   deploy-dev:
     runs-on: ubuntu-latest
     needs: docker-build
-    if: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || inputs.environment == 'vf-dev') && (!failure() || inputs.force_deploy) }}
+    if: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || inputs.environment == 'dev') && (!failure() || inputs.force_deploy) }}
     environment:
-      name: vf-dev
-      url: https://vf-dev-agents.example.com
+      name: dev
+      url: https://dev-agents.niroagent.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -188,7 +188,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy to vf-dev
+      - name: Deploy to dev
         id: deploy
         run: |
           # Make deployment script executable
@@ -199,11 +199,11 @@ jobs:
           export IMAGE_TAG=${{ github.sha }}
           
           # Run deployment
-          ./deploy-to-aws.sh vf-dev
+          ./deploy-to-aws.sh dev
           
           # Get load balancer URL
           LB_URL=$(aws cloudformation describe-stacks \
-            --stack-name na-agents-vf-dev \
+            --stack-name na-agents-dev \
             --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
             --output text)
           
@@ -246,14 +246,14 @@ jobs:
             exit 1
           fi
 
-  # Deploy to vf-stg (manual approval required)
+  # Deploy to stg (manual approval required)
   deploy-staging:
     runs-on: ubuntu-latest
     needs: [docker-build, deploy-dev]
-    if: ${{ (github.ref == 'refs/heads/main' || inputs.environment == 'vf-stg') && (!failure() || inputs.force_deploy) }}
+    if: ${{ (github.ref == 'refs/heads/main' || inputs.environment == 'stg') && (!failure() || inputs.force_deploy) }}
     environment:
-      name: vf-stg
-      url: https://vf-stg-agents.example.com
+      name: stg
+      url: https://stg-agents.niroagent.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -265,16 +265,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy to vf-stg
+      - name: Deploy to stg
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
           export IMAGE_TAG=${{ github.sha }}
-          ./deploy-to-aws.sh vf-stg
+          ./deploy-to-aws.sh stg
           
           LB_URL=$(aws cloudformation describe-stacks \
-            --stack-name na-agents-vf-stg \
+            --stack-name na-agents-stg \
             --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
             --output text)
           
@@ -308,9 +308,9 @@ jobs:
   deploy-production:
     runs-on: ubuntu-latest
     needs: [docker-build, deploy-staging]
-    if: ${{ inputs.environment == 'production' && (!failure() || inputs.force_deploy) }}
+    if: ${{ inputs.environment == 'prd' && (!failure() || inputs.force_deploy) }}
     environment:
-      name: production
+      name: prd
       url: https://agents.niroagent.com
     steps:
       - name: Checkout code
@@ -329,10 +329,10 @@ jobs:
           chmod +x deploy-to-aws.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
           export IMAGE_TAG=${{ github.sha }}
-          ./deploy-to-aws.sh production
+          ./deploy-to-aws.sh prd
           
           LB_URL=$(aws cloudformation describe-stacks \
-            --stack-name na-agents-production \
+            --stack-name na-agents-prd \
             --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
             --output text)
           

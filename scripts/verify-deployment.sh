@@ -5,7 +5,7 @@
 
 set -e
 
-ENVIRONMENT=${1:-vf-dev}
+ENVIRONMENT=${1:-dev}
 BASE_URL=${2:-""}
 TIMEOUT=30
 RETRY_ATTEMPTS=3
@@ -87,15 +87,15 @@ check_agent() {
 determine_base_url() {
     if [ -z "$BASE_URL" ]; then
         case $ENVIRONMENT in
-            "local"|"dev")
+            "local")
                 BASE_URL="http://localhost"
                 ;;
-            "vf-dev")
+            "dev")
                 # Try to get from CloudFormation if AWS CLI is available
                 if command -v aws >/dev/null 2>&1; then
-                    echo -e "${BLUE}🔍 Retrieving vf-dev load balancer URL from AWS...${NC}"
+                    echo -e "${BLUE}🔍 Retrieving dev load balancer URL from AWS...${NC}"
                     LB_DNS=$(aws cloudformation describe-stacks \
-                        --stack-name na-agents-vf-dev \
+                        --stack-name na-agents-dev \
                         --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
                         --output text 2>/dev/null || echo "")
                     if [ -n "$LB_DNS" ]; then
@@ -111,11 +111,11 @@ determine_base_url() {
                     exit 1
                 fi
                 ;;
-            "vf-stg")
+            "stg")
                 if command -v aws >/dev/null 2>&1; then
-                    echo -e "${BLUE}🔍 Retrieving vf-stg load balancer URL from AWS...${NC}"
+                    echo -e "${BLUE}🔍 Retrieving stg load balancer URL from AWS...${NC}"
                     LB_DNS=$(aws cloudformation describe-stacks \
-                        --stack-name na-agents-vf-stg \
+                        --stack-name na-agents-stg \
                         --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
                         --output text 2>/dev/null || echo "")
                     if [ -n "$LB_DNS" ]; then
@@ -130,11 +130,12 @@ determine_base_url() {
                     exit 1
                 fi
                 ;;
-            "production")
+            "prd")
                 BASE_URL="https://agents.niroagent.com"
                 ;;
             *)
                 echo -e "${RED}❌ Unknown environment: $ENVIRONMENT${NC}"
+                echo -e "${YELLOW}💡 Supported environments: local, dev, stg, prd${NC}"
                 echo -e "${YELLOW}💡 Please provide BASE_URL as second argument${NC}"
                 exit 1
                 ;;
@@ -291,13 +292,14 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     echo "Usage: $0 [environment] [base_url]"
     echo ""
     echo "Arguments:"
-    echo "  environment  Target environment (local|dev|vf-dev|vf-stg|production)"
+    echo "  environment  Target environment (local|dev|stg|prd)"
     echo "  base_url     Base URL for testing (optional, auto-detected for AWS environments)"
     echo ""
     echo "Examples:"
     echo "  $0 local                                    # Test local deployment"
-    echo "  $0 vf-dev                                   # Test vf-dev (auto-detect URL)"
-    echo "  $0 vf-stg http://my-loadbalancer.com       # Test vf-stg with specific URL"
+    echo "  $0 dev                                      # Test dev (auto-detect URL)"
+    echo "  $0 stg http://my-loadbalancer.com          # Test stg with specific URL"
+    echo "  $0 prd                                      # Test production environment"
     echo ""
     exit 0
 fi
