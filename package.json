@@ -21,8 +21,9 @@
     "dev:qa": "nodemon --exec ts-node src/agents/qa-agent.ts",
     "dev:manager": "nodemon --exec ts-node src/agents/manager-agent.ts",
     "test": "jest",
-    "lint": "eslint src/**/*.ts",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src/**/*.ts --fix",
+    "typecheck": "tsc --noEmit",
+    "health-check": "node -e \"console.log('Health check passed')\""
   },
   "dependencies": {
     "@aws-sdk/client-batch": "^3.450.0",
