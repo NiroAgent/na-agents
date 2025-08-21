@@ -52,7 +52,7 @@ class AgentSystemTester {
   private async startAgents() {
     console.log('🚀 Starting all agents...');
     try {
-      await execAsync('npm run dev', { cwd: 'E:/Projects/NiroAgent/na-agents' });
+      await execAsync('npm run dev', { cwd: '.' });
       console.log('✅ Agents starting in background\n');
     } catch (error) {
       console.log('⚠️ Agents may already be running or started separately\n');
@@ -447,7 +447,7 @@ class AgentSystemTester {
     };
     
     await fs.writeFile(
-      'E:/Projects/NiroAgent/na-agents/test-report.json',
+      './test-report.json',
       JSON.stringify(report, null, 2)
     );
     console.log('📄 Detailed report saved to test-report.json\n');

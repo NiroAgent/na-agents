@@ -7,8 +7,9 @@ const axios = require('axios');
 const fs = require('fs').promises;
 
 class RegressionTester {
-  constructor() {
+  constructor(baseUrl = 'http://localhost') {
     this.results = [];
+    this.baseUrl = baseUrl;
     this.agents = [
       { name: 'Architect', port: 5001, id: 'ai-architect-agent-1' },
       { name: 'Developer', port: 5002, id: 'ai-developer-agent-1' },
@@ -20,6 +21,14 @@ class RegressionTester {
       { name: 'Chat Interface', port: 7000, endpoint: '/health' },
       { name: 'GitHub Service', port: 6000, endpoint: '/health' }
     ];
+  }
+
+  getAgentUrl(agent) {
+    return `${this.baseUrl}:${agent.port}`;
+  }
+
+  getServiceUrl(service) {
+    return `${this.baseUrl}:${service.port}`;
   }
 
   async runFullRegressionTest() {
@@ -65,7 +74,7 @@ class RegressionTester {
     console.log('🏥 Testing Agent Health Endpoints...');
     for (const agent of this.agents) {
       try {
-        const response = await axios.get(`http://localhost:${agent.port}/health`, { timeout: 5000 });
+        const response = await axios.get(`${this.getAgentUrl(agent)}/health`, { timeout: 5000 });
         const isHealthy = response.status === 200 && (response.data.status === 'healthy' || response.data.healthy);
         
         this.addResult(`${agent.name} Health Check`, isHealthy ? 'PASS' : 'FAIL', {
@@ -88,7 +97,7 @@ class RegressionTester {
     console.log('📊 Testing Agent Status Endpoints...');
     for (const agent of this.agents) {
       try {
-        const response = await axios.get(`http://localhost:${agent.port}/agent/${agent.id}/status`, { timeout: 5000 });
+        const response = await axios.get(`${this.getAgentUrl(agent)}/agent/${agent.id}/status`, { timeout: 5000 });
         const hasRequiredFields = response.data.id || response.data.agentId || response.data.name;
         
         this.addResult(`${agent.name} Status Endpoint`, hasRequiredFields ? 'PASS' : 'FAIL', {
@@ -118,7 +127,7 @@ class RegressionTester {
 
     for (const { agent, task } of testTasks) {
       try {
-        const response = await axios.post(`http://localhost:${agent.port}/agent/${agent.id}/task`, task, { timeout: 10000 });
+        const response = await axios.post(`${this.getAgentUrl(agent)}/agent/${agent.id}/task`, task, { timeout: 10000 });
         const taskAccepted = response.data.taskId && (response.data.status === 'processing' || response.data.status === 'accepted');
         
         this.addResult(`${agent.name} Task Processing`, taskAccepted ? 'PASS' : 'FAIL', {
@@ -148,7 +157,7 @@ class RegressionTester {
           timestamp: new Date().toISOString()
         };
         
-        const response = await axios.post(`http://localhost:${agent.port}/agent/${agent.id}/message`, message, { timeout: 5000 });
+        const response = await axios.post(`${this.getAgentUrl(agent)}/agent/${agent.id}/message`, message, { timeout: 5000 });
         const messageAccepted = response.data.messageId || response.data.status === 'received';
         
         this.addResult(`${agent.name} Message Handling`, messageAccepted ? 'PASS' : 'FAIL', {
@@ -170,7 +179,7 @@ class RegressionTester {
     console.log('📜 Testing Conversation History...');
     for (const agent of this.agents) {
       try {
-        const response = await axios.get(`http://localhost:${agent.port}/agent/${agent.id}/conversation`, { timeout: 5000 });
+        const response = await axios.get(`${this.getAgentUrl(agent)}/agent/${agent.id}/conversation`, { timeout: 5000 });
         const hasHistory = Array.isArray(response.data.history) || Array.isArray(response.data.messages) || response.data.conversations;
         
         this.addResult(`${agent.name} Conversation History`, hasHistory ? 'PASS' : 'FAIL', {
@@ -191,7 +200,7 @@ class RegressionTester {
     console.log('🔧 Testing Supporting Services...');
     for (const service of this.services) {
       try {
-        const response = await axios.get(`http://localhost:${service.port}${service.endpoint}`, { timeout: 5000 });
+        const response = await axios.get(`${this.getServiceUrl(service)}${service.endpoint}`, { timeout: 5000 });
         const isHealthy = response.status === 200;
         
         this.addResult(`${service.name} Service`, isHealthy ? 'PASS' : 'FAIL', {
@@ -212,7 +221,7 @@ class RegressionTester {
   async testChatInterfaceUI() {
     console.log('💻 Testing Chat Interface UI...');
     try {
-      const response = await axios.get('http://localhost:7000/', { timeout: 5000 });
+      const response = await axios.get(`${this.baseUrl}:7000/`, { timeout: 5000 });
       const hasUI = response.status === 200 && response.data.includes('NA-Agents');
       
       this.addResult('Chat Interface UI', hasUI ? 'PASS' : 'FAIL', {
@@ -240,7 +249,7 @@ class RegressionTester {
         targetAgent: 'ai-developer-agent-1'
       };
       
-      const response = await axios.post('http://localhost:5005/agent/ai-manager-agent-1/task', delegationTask, { timeout: 10000 });
+      const response = await axios.post(`${this.baseUrl}:5005/agent/ai-manager-agent-1/task`, delegationTask, { timeout: 10000 });
       const delegationSuccessful = response.data.taskId && response.data.status;
       
       this.addResult('Inter-Agent Communication', delegationSuccessful ? 'PASS' : 'FAIL', {
@@ -262,15 +271,15 @@ class RegressionTester {
     const errorTests = [
       {
         name: 'Invalid Task Format',
-        request: () => axios.post('http://localhost:5001/agent/ai-architect-agent-1/task', { invalid: 'data' })
+        request: () => axios.post(`${this.baseUrl}:5001/agent/ai-architect-agent-1/task`, { invalid: 'data' })
       },
       {
         name: 'Non-existent Endpoint',
-        request: () => axios.get('http://localhost:5001/nonexistent-endpoint')
+        request: () => axios.get(`${this.baseUrl}:5001/nonexistent-endpoint`)
       },
       {
         name: 'Invalid Agent ID',
-        request: () => axios.get('http://localhost:5001/agent/invalid-agent-id/status')
+        request: () => axios.get(`${this.baseUrl}:5001/agent/invalid-agent-id/status`)
       }
     ];
 
@@ -293,7 +302,7 @@ class RegressionTester {
     // Test for common security headers
     for (const agent of this.agents.slice(0, 2)) { // Test first 2 agents
       try {
-        const response = await axios.get(`http://localhost:${agent.port}/health`, { timeout: 5000 });
+        const response = await axios.get(`${this.getAgentUrl(agent)}/health`, { timeout: 5000 });
         const hasSecurityHeaders = response.headers['x-powered-by'] !== 'Express'; // Should be hidden
         
         this.addResult(`${agent.name} Security Headers`, hasSecurityHeaders ? 'PASS' : 'WARN', {
@@ -320,7 +329,7 @@ class RegressionTester {
     for (let i = 0; i < requestCount; i++) {
       for (const agent of this.agents) {
         promises.push(
-          axios.get(`http://localhost:${agent.port}/health`, { timeout: 5000 })
+          axios.get(`${this.getAgentUrl(agent)}/health`, { timeout: 5000 })
             .then(response => ({ success: true, agent: agent.name, time: Date.now() - startTime }))
             .catch(error => ({ success: false, agent: agent.name, error: error.message }))
         );
@@ -354,7 +363,7 @@ class RegressionTester {
     
     // Test concurrent task submissions
     const concurrentTasks = this.agents.map((agent, index) => 
-      axios.post(`http://localhost:${agent.port}/agent/${agent.id}/task`, {
+      axios.post(`${this.getAgentUrl(agent)}/agent/${agent.id}/task`, {
         taskId: `concurrent-${Date.now()}-${index}`,
         task: `Concurrent test task for ${agent.name}`,
         priority: 'low'
@@ -384,7 +393,7 @@ class RegressionTester {
     for (const agent of this.agents) {
       const startTime = Date.now();
       try {
-        await axios.get(`http://localhost:${agent.port}/health`, { timeout: 5000 });
+        await axios.get(`${this.getAgentUrl(agent)}/health`, { timeout: 5000 });
         const responseTime = Date.now() - startTime;
         resourceTests.push({ agent: agent.name, responseTime, healthy: true });
       } catch (error) {
@@ -414,7 +423,7 @@ class RegressionTester {
       const checkResults = [];
       for (const agent of this.agents) {
         try {
-          const response = await axios.get(`http://localhost:${agent.port}/health`, { timeout: 3000 });
+          const response = await axios.get(`${this.getAgentUrl(agent)}/health`, { timeout: 3000 });
           checkResults.push({ agent: agent.name, healthy: response.status === 200 });
         } catch (error) {
           checkResults.push({ agent: agent.name, healthy: false });
@@ -521,10 +530,35 @@ class RegressionTester {
 
 // Run the comprehensive regression test
 if (require.main === module) {
-  const tester = new RegressionTester();
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  let baseUrl = 'http://localhost';
+  let passThreshold = 80;
+  
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--url' && args[i + 1]) {
+      baseUrl = args[i + 1];
+      i++; // Skip next argument
+    } else if (args[i] === '--threshold' && args[i + 1]) {
+      passThreshold = parseInt(args[i + 1]);
+      i++; // Skip next argument
+    } else if (args[i] === '--help') {
+      console.log('Usage: node regression-test.js [options]');
+      console.log('Options:');
+      console.log('  --url URL          Base URL for testing (default: http://localhost)');
+      console.log('  --threshold NUM    Pass threshold percentage (default: 80)');
+      console.log('  --help            Show this help message');
+      process.exit(0);
+    }
+  }
+  
+  console.log(`🎯 Testing against: ${baseUrl}`);
+  console.log(`📊 Pass threshold: ${passThreshold}%\n`);
+  
+  const tester = new RegressionTester(baseUrl);
   tester.runFullRegressionTest()
     .then(summary => {
-      process.exit(summary.passRate >= 80 ? 0 : 1);
+      process.exit(summary.passRate >= passThreshold ? 0 : 1);
     })
     .catch(error => {
       console.error('❌ Regression test suite failed:', error);

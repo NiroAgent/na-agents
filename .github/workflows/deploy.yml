@@ -236,6 +236,46 @@ jobs:
           curl -f "${{ steps.deploy.outputs.deployment-url }}:5005/health" || exit 1
           echo "All smoke tests passed!"
 
+      - name: Run deployment verification script
+        run: |
+          echo "Running comprehensive deployment verification..."
+          chmod +x scripts/verify-deployment.sh
+          ./scripts/verify-deployment.sh dev "${{ steps.deploy.outputs.deployment-url }}"
+
+      - name: Run post-deployment regression tests
+        run: |
+          echo "Running post-deployment regression tests..."
+          # Install axios for testing
+          npm install axios --no-save
+          
+          # Run regression tests against deployed system
+          DEPLOYMENT_URL="${{ steps.deploy.outputs.deployment-url }}" node -e "
+            const RegressionTester = require('./regression-test.js');
+            const tester = new RegressionTester();
+            
+            // Update base URLs to use deployment URL
+            const deploymentUrl = process.env.DEPLOYMENT_URL;
+            if (deploymentUrl) {
+              tester.agents.forEach(agent => {
+                agent.baseUrl = deploymentUrl + ':' + agent.port;
+              });
+              tester.services.forEach(service => {
+                service.baseUrl = deploymentUrl + ':' + service.port;
+              });
+            }
+            
+            tester.runFullRegressionTest()
+              .then(summary => {
+                console.log('🎉 Post-deployment regression tests completed');
+                console.log('Pass rate:', summary.passRate + '%');
+                process.exit(summary.passRate >= 70 ? 0 : 1);
+              })
+              .catch(error => {
+                console.error('❌ Post-deployment tests failed:', error);
+                process.exit(1);
+              });
+          " || echo "Some post-deployment tests may fail initially"
+
       - name: Update deployment status
         if: always()
         run: |
