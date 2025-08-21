@@ -191,15 +191,15 @@ jobs:
         id: deploy
         run: |
           # Make deployment script executable
-          chmod +x deploy-to-aws.sh
+          chmod +x deploy-to-existing-ec2.sh
           chmod +x scripts/setup-agents-dns.sh
           
           # Set environment variables
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_DEV }}
-          export IMAGE_TAG=${{ github.sha }}
+          export INSTANCE_ID=${{ vars.EC2_INSTANCE_ID_DEV || 'i-0af59b7036f7b0b77' }}
           
-          # Run main infrastructure deployment
-          ./deploy-to-aws.sh dev
+          # Deploy TypeScript agents to existing EC2 instance
+          ./deploy-to-existing-ec2.sh ${INSTANCE_ID}
           
           # Deploy agents DNS records to existing visualforge.ai infrastructure
           echo "🌐 Setting up agents DNS records for dev environment..."
@@ -210,13 +210,13 @@ jobs:
           chmod +x scripts/setup-security.sh
           ./scripts/setup-security.sh dev
           
-          # Get load balancer URL
-          LB_URL=$(aws cloudformation describe-stacks \
-            --stack-name na-agents-dev \
-            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+          # Get EC2 instance public IP
+          EC2_IP=$(aws ec2 describe-instances \
+            --instance-ids ${INSTANCE_ID} \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
           
-          echo "deployment-url=http://$LB_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=http://$EC2_IP" >> $GITHUB_OUTPUT
 
       - name: Wait for deployment to be ready
         run: |
@@ -317,24 +317,24 @@ jobs:
       - name: Deploy to stg
         id: deploy
         run: |
-          chmod +x deploy-to-aws.sh
+          chmod +x deploy-to-existing-ec2.sh
           chmod +x scripts/setup-agents-dns.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_STG }}
-          export IMAGE_TAG=${{ github.sha }}
+          export INSTANCE_ID=${{ vars.EC2_INSTANCE_ID_STG || 'i-0af59b7036f7b0b77' }}
           
-          # Run main infrastructure deployment
-          ./deploy-to-aws.sh stg
+          # Deploy TypeScript agents to EC2 instance
+          ./deploy-to-existing-ec2.sh ${INSTANCE_ID}
           
           # Deploy agents DNS records to existing visualforge.ai infrastructure
           echo "🌐 Setting up agents DNS records for stg environment..."
           ./scripts/setup-agents-dns.sh stg
           
-          LB_URL=$(aws cloudformation describe-stacks \
-            --stack-name na-agents-stg \
-            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+          EC2_IP=$(aws ec2 describe-instances \
+            --instance-ids ${INSTANCE_ID} \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
           
-          echo "deployment-url=http://$LB_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=http://$EC2_IP" >> $GITHUB_OUTPUT
 
       - name: Run comprehensive tests
         run: |
@@ -382,24 +382,24 @@ jobs:
       - name: Deploy to production
         id: deploy
         run: |
-          chmod +x deploy-to-aws.sh
+          chmod +x deploy-to-existing-ec2.sh
           chmod +x scripts/setup-agents-dns.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_PRD }}
-          export IMAGE_TAG=${{ github.sha }}
+          export INSTANCE_ID=${{ vars.EC2_INSTANCE_ID_PRD || 'i-0af59b7036f7b0b77' }}
           
-          # Run main infrastructure deployment
-          ./deploy-to-aws.sh prd
+          # Deploy TypeScript agents to EC2 instance
+          ./deploy-to-existing-ec2.sh ${INSTANCE_ID}
           
           # Deploy agents DNS records to existing visualforge.ai infrastructure
           echo "🌐 Setting up agents DNS records for prd environment..."
           ./scripts/setup-agents-dns.sh prd
           
-          LB_URL=$(aws cloudformation describe-stacks \
-            --stack-name na-agents-prd \
-            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+          EC2_IP=$(aws ec2 describe-instances \
+            --instance-ids ${INSTANCE_ID} \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
           
-          echo "deployment-url=http://$LB_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=http://$EC2_IP" >> $GITHUB_OUTPUT
 
       - name: Production health check
         run: |
