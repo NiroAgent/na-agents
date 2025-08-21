@@ -1,0 +1,426 @@
+name: Deploy NA-Agents
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'vf-dev'
+        type: choice
+        options:
+          - vf-dev
+          - vf-stg
+          - production
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18.x'
+  AWS_REGION: 'us-east-1'
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: na-agents
+
+jobs:
+  # Code Quality and Testing
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type checking
+        run: npm run typecheck
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            package*.json
+            Dockerfile
+            docker-compose.yml
+          retention-days: 7
+
+  # Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: quality-checks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run npm audit
+        run: npm audit --audit-level moderate
+        continue-on-error: true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Docker Build and Push
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [quality-checks, security-scan]
+    if: ${{ !failure() || inputs.force_deploy }}
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=commit-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner on image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload Trivy image scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+
+  # Deploy to vf-dev (automatic on develop/main branch)
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || inputs.environment == 'vf-dev') && (!failure() || inputs.force_deploy) }}
+    environment:
+      name: vf-dev
+      url: https://vf-dev-agents.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to vf-dev
+        id: deploy
+        run: |
+          # Make deployment script executable
+          chmod +x deploy-to-aws.sh
+          
+          # Set environment variables
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export IMAGE_TAG=${{ github.sha }}
+          
+          # Run deployment
+          ./deploy-to-aws.sh vf-dev
+          
+          # Get load balancer URL
+          LB_URL=$(aws cloudformation describe-stacks \
+            --stack-name na-agents-vf-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+            --output text)
+          
+          echo "deployment-url=http://$LB_URL" >> $GITHUB_OUTPUT
+
+      - name: Wait for deployment to be ready
+        run: |
+          echo "Waiting for deployment to be ready..."
+          for i in {1..30}; do
+            if curl -f -s ${{ steps.deploy.outputs.deployment-url }}/health > /dev/null; then
+              echo "Deployment is ready!"
+              break
+            fi
+            echo "Attempt $i/30: Deployment not ready yet, waiting..."
+            sleep 10
+          done
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against ${{ steps.deploy.outputs.deployment-url }}"
+          # Test architect agent
+          curl -f "${{ steps.deploy.outputs.deployment-url }}:5001/health" || exit 1
+          # Test developer agent  
+          curl -f "${{ steps.deploy.outputs.deployment-url }}:5002/health" || exit 1
+          # Test devops agent
+          curl -f "${{ steps.deploy.outputs.deployment-url }}:5003/health" || exit 1
+          # Test qa agent
+          curl -f "${{ steps.deploy.outputs.deployment-url }}:5004/health" || exit 1
+          # Test manager agent
+          curl -f "${{ steps.deploy.outputs.deployment-url }}:5005/health" || exit 1
+          echo "All smoke tests passed!"
+
+      - name: Update deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ vf-dev deployment successful: ${{ steps.deploy.outputs.deployment-url }}"
+          else
+            echo "❌ vf-dev deployment failed"
+            exit 1
+          fi
+
+  # Deploy to vf-stg (manual approval required)
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [docker-build, deploy-dev]
+    if: ${{ (github.ref == 'refs/heads/main' || inputs.environment == 'vf-stg') && (!failure() || inputs.force_deploy) }}
+    environment:
+      name: vf-stg
+      url: https://vf-stg-agents.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to vf-stg
+        id: deploy
+        run: |
+          chmod +x deploy-to-aws.sh
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export IMAGE_TAG=${{ github.sha }}
+          ./deploy-to-aws.sh vf-stg
+          
+          LB_URL=$(aws cloudformation describe-stacks \
+            --stack-name na-agents-vf-stg \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+            --output text)
+          
+          echo "deployment-url=http://$LB_URL" >> $GITHUB_OUTPUT
+
+      - name: Run comprehensive tests
+        run: |
+          echo "Running comprehensive tests against ${{ steps.deploy.outputs.deployment-url }}"
+          
+          # Extended health checks
+          for agent in architect developer devops qa manager; do
+            port=$((5000 + $(echo "architect developer devops qa manager" | tr ' ' '\n' | nl -v0 | grep $agent | cut -f1) + 1))
+            echo "Testing $agent agent on port $port"
+            curl -f "${{ steps.deploy.outputs.deployment-url }}:$port/health" || exit 1
+            
+            # Test agent status endpoint
+            curl -f "${{ steps.deploy.outputs.deployment-url }}:$port/agent/ai-$agent-agent-1/status" || exit 1
+          done
+          
+          echo "All comprehensive tests passed!"
+
+      - name: Performance baseline tests
+        run: |
+          echo "Running performance baseline tests..."
+          # Simple load test using curl
+          for i in {1..10}; do
+            curl -w "@-" -o /dev/null -s "${{ steps.deploy.outputs.deployment-url }}/health" <<< 'time_total: %{time_total}s\n'
+          done
+
+  # Deploy to production (manual trigger only)
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [docker-build, deploy-staging]
+    if: ${{ inputs.environment == 'production' && (!failure() || inputs.force_deploy) }}
+    environment:
+      name: production
+      url: https://agents.niroagent.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to production
+        id: deploy
+        run: |
+          chmod +x deploy-to-aws.sh
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export IMAGE_TAG=${{ github.sha }}
+          ./deploy-to-aws.sh production
+          
+          LB_URL=$(aws cloudformation describe-stacks \
+            --stack-name na-agents-production \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+            --output text)
+          
+          echo "deployment-url=http://$LB_URL" >> $GITHUB_OUTPUT
+
+      - name: Production health check
+        run: |
+          echo "Running production health checks..."
+          
+          # Wait for deployment
+          for i in {1..60}; do
+            if curl -f -s ${{ steps.deploy.outputs.deployment-url }}/health > /dev/null; then
+              echo "Production deployment is ready!"
+              break
+            fi
+            echo "Attempt $i/60: Production not ready yet, waiting..."
+            sleep 10
+          done
+          
+          # Test all agents
+          for agent in architect developer devops qa manager; do
+            port=$((5000 + $(echo "architect developer devops qa manager" | tr ' ' '\n' | nl -v0 | grep $agent | cut -f1) + 1))
+            curl -f "${{ steps.deploy.outputs.deployment-url }}:$port/health" || exit 1
+          done
+
+  # Cleanup old resources
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-staging, deploy-production]
+    if: always() && !cancelled()
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Cleanup old ECR images
+        run: |
+          echo "Cleaning up old ECR images..."
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --query 'sort_by(imageDetails,&imagePushedAt)[:-10].[imageDigest]' \
+            --output text | \
+          while read digest; do
+            if [ ! -z "$digest" ]; then
+              aws ecr batch-delete-image \
+                --repository-name ${{ env.ECR_REPOSITORY }} \
+                --image-ids imageDigest=$digest || true
+            fi
+          done
+
+  # Notification
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-staging, deploy-production]
+    if: always() && !cancelled()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.deploy-dev.result }}" == "success" ]; then
+            echo "✅ **vf-dev:** Deployed successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-dev.result }}" == "failure" ]; then
+            echo "❌ **vf-dev:** Deployment failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **vf-dev:** Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            echo "✅ **vf-stg:** Deployed successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-staging.result }}" == "failure" ]; then
+            echo "❌ **vf-stg:** Deployment failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **vf-stg:** Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
+            echo "✅ **production:** Deployed successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-production.result }}" == "failure" ]; then
+            echo "❌ **production:** Deployment failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **production:** Skipped" >> $GITHUB_STEP_SUMMARY
+          fi

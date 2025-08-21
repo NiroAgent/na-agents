@@ -1,0 +1,383 @@
+{
+  "timestamp": "2025-08-21T04:05:16.793Z",
+  "summary": {
+    "total": 37,
+    "passed": 10,
+    "failed": 27,
+    "passRate": "27.03%"
+  },
+  "results": [
+    {
+      "test": "Architect Health Check",
+      "status": "PASS",
+      "details": {
+        "status": "healthy",
+        "agent": "AI Architect Agent",
+        "uptime": 259321
+      }
+    },
+    {
+      "test": "Developer Health Check",
+      "status": "PASS",
+      "details": {
+        "status": "healthy",
+        "agent": "AI Developer Agent",
+        "uptime": 254049
+      }
+    },
+    {
+      "test": "DevOps Health Check",
+      "status": "PASS",
+      "details": {
+        "status": "healthy",
+        "agent": "AI DevOps Agent",
+        "uptime": 196789
+      }
+    },
+    {
+      "test": "QA Health Check",
+      "status": "PASS",
+      "details": {
+        "status": "healthy",
+        "agent": "AI QA Agent",
+        "uptime": 243509
+      }
+    },
+    {
+      "test": "Manager Health Check",
+      "status": "PASS",
+      "details": {
+        "status": "healthy",
+        "agent": "AI Manager Agent",
+        "uptime": 237894
+      }
+    },
+    {
+      "test": "Architect Status Endpoint",
+      "status": "PASS",
+      "details": {
+        "id": "ai-architect-agent-1",
+        "type": "architect",
+        "status": "idle",
+        "uptime": 259331,
+        "tasksCompleted": 0,
+        "tasksInProgress": 0,
+        "lastActivity": "2025-08-21T04:05:16.669Z",
+        "cpu": 1.515,
+        "memory": 120.5109634399414,
+        "capabilities": [
+          "system_architecture",
+          "api_design",
+          "database_design",
+          "technology_selection",
+          "integration_planning",
+          "scalability_analysis",
+          "security_architecture",
+          "performance_optimization"
+        ]
+      }
+    },
+    {
+      "test": "Developer Status Endpoint",
+      "status": "PASS",
+      "details": {
+        "id": "ai-developer-agent-1",
+        "type": "developer",
+        "status": "idle",
+        "uptime": 254056,
+        "tasksCompleted": 0,
+        "tasksInProgress": 0,
+        "lastActivity": "2025-08-21T04:05:16.670Z",
+        "cpu": 1.734,
+        "memory": 120.43402862548828,
+        "capabilities": [
+          "typescript_development",
+          "nodejs_development",
+          "python_development",
+          "api_development",
+          "database_integration",
+          "test_generation",
+          "code_review",
+          "refactoring",
+          "aws_lambda_development",
+          "containerization"
+        ]
+      }
+    },
+    {
+      "test": "DevOps Status Endpoint",
+      "status": "PASS",
+      "details": {
+        "id": "ai-devops-agent-1",
+        "type": "devops",
+        "status": "idle",
+        "uptime": 196796,
+        "tasksCompleted": 0,
+        "tasksInProgress": 0,
+        "lastActivity": "2025-08-21T04:05:16.671Z",
+        "cpu": 2.296,
+        "memory": 166.82852935791016,
+        "capabilities": [
+          "aws_lambda_deployment",
+          "fargate_deployment",
+          "container_orchestration",
+          "ci_cd_pipeline",
+          "infrastructure_as_code",
+          "monitoring_setup",
+          "log_aggregation",
+          "auto_scaling",
+          "disaster_recovery",
+          "cost_optimization"
+        ]
+      }
+    },
+    {
+      "test": "QA Status Endpoint",
+      "status": "PASS",
+      "details": {
+        "id": "ai-qa-agent-1",
+        "type": "qa",
+        "status": "idle",
+        "uptime": 243515,
+        "tasksCompleted": 0,
+        "tasksInProgress": 0,
+        "lastActivity": "2025-08-21T04:05:16.672Z",
+        "cpu": 1.796,
+        "memory": 119.88023376464844,
+        "capabilities": [
+          "unit_testing",
+          "integration_testing",
+          "e2e_testing",
+          "performance_testing",
+          "security_testing",
+          "test_automation",
+          "test_generation",
+          "coverage_analysis",
+          "regression_testing",
+          "load_testing"
+        ]
+      }
+    },
+    {
+      "test": "Manager Status Endpoint",
+      "status": "PASS",
+      "details": {
+        "id": "ai-manager-agent-1",
+        "type": "manager",
+        "status": "idle",
+        "uptime": 237900,
+        "tasksCompleted": 0,
+        "tasksInProgress": 0,
+        "lastActivity": "2025-08-21T04:05:16.674Z",
+        "cpu": 2.546,
+        "memory": 227.07404327392578,
+        "capabilities": [
+          "project_management",
+          "task_assignment",
+          "workflow_orchestration",
+          "agent_coordination",
+          "progress_tracking",
+          "resource_allocation",
+          "priority_management",
+          "deadline_tracking",
+          "team_communication",
+          "report_generation"
+        ]
+      }
+    },
+    {
+      "test": "Architect Task Processing",
+      "status": "FAIL",
+      "details": {
+        "taskId": "9401f27e-b980-4861-a741-28b0ae540f5e",
+        "status": "failed",
+        "error": "Cannot read properties of undefined (reading 'toLowerCase')"
+      }
+    },
+    {
+      "test": "Developer Task Processing",
+      "status": "FAIL",
+      "details": {
+        "taskId": "8678c173-4711-48a0-a2ed-df360438acf5",
+        "status": "failed",
+        "error": "Cannot read properties of undefined (reading 'toLowerCase')"
+      }
+    },
+    {
+      "test": "DevOps Task Processing",
+      "status": "FAIL",
+      "details": {
+        "taskId": "248ae08e-a6f9-409c-a073-23761f0d322d",
+        "status": "failed",
+        "error": "Cannot read properties of undefined (reading 'toLowerCase')"
+      }
+    },
+    {
+      "test": "QA Task Processing",
+      "status": "FAIL",
+      "details": {
+        "taskId": "38cab14c-a679-476e-8678-22f347af0900",
+        "status": "failed",
+        "error": "Cannot read properties of undefined (reading 'toLowerCase')"
+      }
+    },
+    {
+      "test": "Manager Task Processing",
+      "status": "FAIL",
+      "details": {
+        "taskId": "de08a171-1d0c-455d-862e-4efbc8df07f0",
+        "status": "failed",
+        "error": "Cannot read properties of undefined (reading 'toLowerCase')"
+      }
+    },
+    {
+      "test": "Architect Message Handling",
+      "status": "FAIL",
+      "details": {
+        "status": "processed",
+        "message": "Architect agent processed message of type: undefined"
+      }
+    },
+    {
+      "test": "Developer Message Handling",
+      "status": "FAIL",
+      "details": {
+        "status": "processed",
+        "message": "Developer agent processed message of type: undefined"
+      }
+    },
+    {
+      "test": "DevOps Message Handling",
+      "status": "FAIL",
+      "details": {
+        "status": "processed",
+        "message": "DevOps agent processed: undefined"
+      }
+    },
+    {
+      "test": "QA Message Handling",
+      "status": "FAIL",
+      "details": {
+        "status": "processed",
+        "message": "QA agent processed: undefined"
+      }
+    },
+    {
+      "test": "Manager Message Handling",
+      "status": "FAIL",
+      "details": {
+        "status": "processed",
+        "message": "Manager agent processed: undefined"
+      }
+    },
+    {
+      "test": "Architect Conversation History",
+      "status": "FAIL",
+      "details": {
+        "messageCount": 0
+      }
+    },
+    {
+      "test": "Developer Conversation History",
+      "status": "FAIL",
+      "details": {
+        "messageCount": 0
+      }
+    },
+    {
+      "test": "DevOps Conversation History",
+      "status": "FAIL",
+      "details": {
+        "messageCount": 0
+      }
+    },
+    {
+      "test": "QA Conversation History",
+      "status": "FAIL",
+      "details": {
+        "messageCount": 0
+      }
+    },
+    {
+      "test": "Manager Conversation History",
+      "status": "FAIL",
+      "details": {
+        "messageCount": 0
+      }
+    },
+    {
+      "test": "Architect Control",
+      "status": "FAIL",
+      "message": "read ECONNRESET"
+    },
+    {
+      "test": "Inter-Agent Communication",
+      "status": "FAIL",
+      "message": "Request failed with status code 404"
+    },
+    {
+      "test": "Architect Dashboard Registration",
+      "status": "FAIL",
+      "message": ""
+    },
+    {
+      "test": "Developer Dashboard Registration",
+      "status": "FAIL",
+      "details": {
+        "registered": false
+      }
+    },
+    {
+      "test": "DevOps Dashboard Registration",
+      "status": "FAIL",
+      "details": {
+        "registered": false
+      }
+    },
+    {
+      "test": "QA Dashboard Registration",
+      "status": "FAIL",
+      "details": {
+        "registered": false
+      }
+    },
+    {
+      "test": "Manager Dashboard Registration",
+      "status": "FAIL",
+      "details": {
+        "registered": false
+      }
+    },
+    {
+      "test": "Invalid Task Format",
+      "status": "FAIL",
+      "details": {}
+    },
+    {
+      "test": "Non-existent Endpoint",
+      "status": "FAIL",
+      "details": {}
+    },
+    {
+      "test": "Invalid Agent ID",
+      "status": "FAIL",
+      "details": {}
+    },
+    {
+      "test": "Load Test",
+      "status": "FAIL",
+      "details": {
+        "totalRequests": 250,
+        "successCount": 200,
+        "failureCount": 50,
+        "duration": "79ms",
+        "requestsPerSecond": 3165
+      }
+    },
+    {
+      "test": "AWS Integration",
+      "status": "FAIL",
+      "message": "Request failed with status code 404"
+    }
+  ]
+}

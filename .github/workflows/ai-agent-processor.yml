@@ -1,0 +1,371 @@
+name: AI Agent Issue Processor
+
+on:
+  issues:
+    types: [opened, reopened, edited, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  route-to-agent:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'labeled'
+    
+    outputs:
+      agent-type: ${{ steps.determine-agent.outputs.agent-type }}
+      compute-type: ${{ steps.determine-agent.outputs.compute-type }}
+      should-process: ${{ steps.determine-agent.outputs.should-process }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Determine agent assignment
+      id: determine-agent
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = context.payload.issue.title.toLowerCase();
+          const body = context.payload.issue.body?.toLowerCase() || '';
+          const labels = context.payload.issue.labels.map(label => label.name.toLowerCase());
+          
+          console.log('Analyzing issue:', title);
+          console.log('Labels:', labels);
+          
+          // Skip if already processed
+          if (labels.includes('ai-completed') || labels.includes('ai-failed')) {
+            core.setOutput('should-process', 'false');
+            return;
+          }
+          
+          // Determine agent type
+          let agentType = 'developer';  // default
+          let computeType = 'fargate';  // default
+          
+          // Priority 1: Explicit labels
+          const labelMapping = {
+            'bug': 'developer',
+            'feature': 'developer',
+            'enhancement': 'developer',
+            'architecture': 'architect',
+            'design': 'architect',
+            'testing': 'qa',
+            'qa': 'qa',
+            'quality': 'qa',
+            'deployment': 'devops',
+            'infrastructure': 'devops',
+            'devops': 'devops',
+            'ci/cd': 'devops',
+            'security': 'security',
+            'vulnerability': 'security',
+            'performance': 'operations',
+            'monitoring': 'operations',
+            'support': 'support',
+            'customer': 'customer-success',
+            'analytics': 'analytics',
+            'reporting': 'analytics',
+            'finance': 'finance',
+            'cost': 'finance',
+            'marketing': 'marketing',
+            'sales': 'sales',
+            'management': 'manager',
+            'strategy': 'manager'
+          };
+          
+          // Check labels first
+          for (const label of labels) {
+            if (labelMapping[label]) {
+              agentType = labelMapping[label];
+              break;
+            }
+          }
+          
+          // Priority 2: Title patterns
+          const titlePatterns = {
+            'developer': ['fix', 'implement', 'add', 'create', 'build', 'develop', 'code'],
+            'architect': ['design', 'architecture', 'structure', 'pattern', 'framework'],
+            'qa': ['test', 'verify', 'validate', 'check', 'quality'],
+            'devops': ['deploy', 'infrastructure', 'pipeline', 'ci/cd', 'aws'],
+            'security': ['secure', 'vulnerability', 'auth', 'permission', 'encrypt'],
+            'support': ['help', 'issue', 'problem', 'error', 'broken'],
+            'manager': ['strategy', 'plan', 'roadmap', 'priority', 'decision']
+          };
+          
+          if (agentType === 'developer') {  // Only check patterns if no label match
+            for (const [type, patterns] of Object.entries(titlePatterns)) {
+              if (patterns.some(pattern => title.includes(pattern))) {
+                agentType = type;
+                break;
+              }
+            }
+          }
+          
+          // Determine compute type based on agent
+          const computeMapping = {
+            'developer': 'fargate',
+            'architect': 'fargate', 
+            'qa': 'batch',
+            'devops': 'fargate',
+            'manager': 'lambda',
+            'support': 'lambda',
+            'security': 'fargate',
+            'analytics': 'batch',
+            'finance': 'lambda',
+            'operations': 'fargate',
+            'marketing': 'lambda',
+            'sales': 'lambda',
+            'customer-success': 'lambda'
+          };
+          
+          computeType = computeMapping[agentType] || 'fargate';
+          
+          console.log('Agent assignment:', agentType, computeType);
+          
+          core.setOutput('agent-type', agentType);
+          core.setOutput('compute-type', computeType);
+          core.setOutput('should-process', 'true');
+    
+    - name: Add assignment comment
+      if: steps.determine-agent.outputs.should-process == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const agentType = '${{ steps.determine-agent.outputs.agent-type }}';
+          const computeType = '${{ steps.determine-agent.outputs.compute-type }}';
+          
+          const agentNames = {
+            'developer': 'AI Developer Agent',
+            'architect': 'AI Architect Agent',
+            'qa': 'AI QA Agent',
+            'devops': 'AI DevOps Agent',
+            'manager': 'AI Manager Agent',
+            'support': 'AI Support Agent',
+            'security': 'AI Security Agent',
+            'analytics': 'AI Analytics Agent',
+            'finance': 'AI Finance Agent',
+            'operations': 'AI Operations Agent',
+            'marketing': 'AI Marketing Agent',
+            'sales': 'AI Sales Agent',
+            'customer-success': 'AI Customer Success Agent'
+          };
+          
+          const comment = `## 🤖 AI Agent Assignment
+          
+**Assigned to:** ${agentNames[agentType] || 'AI Agent'}
+**Agent Type:** ${agentType}
+**Compute Platform:** ${computeType.toUpperCase()}
+**Processing Status:** Queued for processing
+
+The AI agent will begin processing this issue shortly. Updates will be posted as comments.
+
+---
+*Automated by GitHub Actions*`;
+          
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: comment
+          });
+          
+          // Add labels
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            labels: [
+              'ai-processing',
+              `agent-${agentType}`,
+              `compute-${computeType}`
+            ]
+          });
+
+  process-with-fargate:
+    needs: route-to-agent
+    runs-on: ubuntu-latest
+    if: needs.route-to-agent.outputs.should-process == 'true' && needs.route-to-agent.outputs.compute-type == 'fargate'
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+    
+    - name: Run Fargate task
+      run: |
+        aws ecs run-task \
+          --cluster ai-agents-cluster \
+          --task-definition ai-agent-task \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[${{ vars.AWS_SUBNET_ID }}],securityGroups=[${{ vars.AWS_SECURITY_GROUP_ID }}],assignPublicIp=ENABLED}" \
+          --overrides '{
+            "containerOverrides": [
+              {
+                "name": "ai-agent-container",
+                "environment": [
+                  {"name": "GITHUB_TOKEN", "value": "${{ secrets.GITHUB_TOKEN }}"},
+                  {"name": "GITHUB_REPO", "value": "${{ github.repository }}"},
+                  {"name": "ISSUE_NUMBER", "value": "${{ github.event.issue.number }}"},
+                  {"name": "AGENT_TYPE", "value": "${{ needs.route-to-agent.outputs.agent-type }}"},
+                  {"name": "AWS_REGION", "value": "${{ vars.AWS_REGION || 'us-east-1' }}"}
+                ]
+              }
+            ]
+          }' \
+          --tags key=GitHubIssue,value=${{ github.event.issue.number }} \
+               key=Repository,value=${{ github.repository }} \
+               key=AgentType,value=${{ needs.route-to-agent.outputs.agent-type }}
+
+  process-with-batch:
+    needs: route-to-agent
+    runs-on: ubuntu-latest
+    if: needs.route-to-agent.outputs.should-process == 'true' && needs.route-to-agent.outputs.compute-type == 'batch'
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+    
+    - name: Submit Batch job
+      run: |
+        JOB_NAME="ai-agent-${{ github.event.issue.number }}-$(date +%s)"
+        
+        aws batch submit-job \
+          --job-name "$JOB_NAME" \
+          --job-queue ai-agents-queue \
+          --job-definition ai-agent-processor \
+          --parameters githubToken="${{ secrets.GITHUB_TOKEN }}",githubRepo="${{ github.repository }}",issueNumber="${{ github.event.issue.number }}",agentType="${{ needs.route-to-agent.outputs.agent-type }}" \
+          --timeout attemptDurationSeconds=3600 \
+          --tags GitHubIssue="${{ github.event.issue.number }}",Repository="${{ github.repository }}",AgentType="${{ needs.route-to-agent.outputs.agent-type }}"
+
+  process-with-lambda:
+    needs: route-to-agent
+    runs-on: ubuntu-latest
+    if: needs.route-to-agent.outputs.should-process == 'true' && needs.route-to-agent.outputs.compute-type == 'lambda'
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+    
+    - name: Invoke Lambda function
+      run: |
+        PAYLOAD='{
+          "github_token": "${{ secrets.GITHUB_TOKEN }}",
+          "issue_event": {
+            "repository": "${{ github.repository }}",
+            "issue_number": ${{ github.event.issue.number }},
+            "issue_title": "${{ github.event.issue.title }}",
+            "issue_body": "${{ github.event.issue.body }}",
+            "labels": ${{ toJson(github.event.issue.labels) }}
+          },
+          "agent_config": {
+            "agent_type": "${{ needs.route-to-agent.outputs.agent-type }}",
+            "timeout_minutes": 15
+          }
+        }'
+        
+        aws lambda invoke \
+          --function-name ai-agent-processor \
+          --invocation-type Event \
+          --payload "$PAYLOAD" \
+          response.json
+
+  # Fallback: Direct processing in GitHub Actions
+  process-direct:
+    needs: route-to-agent
+    runs-on: ubuntu-latest
+    if: failure() || (needs.route-to-agent.outputs.should-process == 'true' && vars.USE_DIRECT_PROCESSING == 'true')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Process issue directly
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        AGENT_TYPE: ${{ needs.route-to-agent.outputs.agent-type }}
+      run: |
+        python enhanced-batch-agent-processor.py
+    
+    - name: Upload processing logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agent-processing-logs-${{ github.event.issue.number }}
+        path: |
+          /tmp/agent-result.json
+          /var/log/agents/*.log
+        retention-days: 30
+
+  # Status monitoring job
+  monitor-processing:
+    needs: [route-to-agent]
+    runs-on: ubuntu-latest
+    if: needs.route-to-agent.outputs.should-process == 'true'
+    
+    steps:
+    - name: Wait for processing completion
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Wait up to 5 minutes for processing to complete
+          const maxWaitTime = 5 * 60 * 1000; // 5 minutes
+          const checkInterval = 30 * 1000; // 30 seconds
+          const startTime = Date.now();
+          
+          while (Date.now() - startTime < maxWaitTime) {
+            try {
+              const { data: issue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number
+              });
+              
+              const labels = issue.labels.map(label => label.name);
+              
+              if (labels.includes('ai-completed') || labels.includes('ai-failed')) {
+                console.log('Processing completed');
+                return;
+              }
+              
+              console.log('Still processing... waiting...');
+              await new Promise(resolve => setTimeout(resolve, checkInterval));
+              
+            } catch (error) {
+              console.error('Error checking status:', error);
+              break;
+            }
+          }
+          
+          // If we get here, processing may have timed out
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: '⚠️ Agent processing appears to be taking longer than expected. Check the AWS console for task status.'
+          });

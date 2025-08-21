@@ -1,0 +1,430 @@
+name: Test and Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18.x'
+
+jobs:
+  # Unit and Integration Tests
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_agents_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd "pg_isready -U test_user -d test_agents_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test << EOF
+          NODE_ENV=test
+          LOG_LEVEL=error
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          POSTGRES_DB=test_agents_db
+          POSTGRES_USER=test_user
+          POSTGRES_PASSWORD=test_password
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          DASHBOARD_URL=http://localhost:4001
+          GITHUB_SERVICE_PORT=6000
+          CHAT_SERVICE_PORT=7000
+          EOF
+
+      - name: Run TypeScript compilation
+        run: npm run build
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm test
+        env:
+          CI: true
+
+      - name: Generate test coverage
+        run: npm run test:coverage || echo "Coverage generation failed"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.node-version == '18.x'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  # Docker Build Test
+  docker-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: na-agents:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Docker container test
+        run: |
+          # Start the container
+          docker run -d --name na-agents-test -p 5001:5001 na-agents:test
+          
+          # Wait for container to start
+          sleep 30
+          
+          # Test health endpoint
+          curl -f http://localhost:5001/health || exit 1
+          
+          # Stop container
+          docker stop na-agents-test
+
+  # Integration Tests with Services
+  integration:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start services with Docker Compose
+        run: |
+          # Create test environment
+          cp .env.example .env
+          
+          # Start services
+          docker-compose -f docker-compose.yml up -d redis postgres
+          
+          # Wait for services to be ready
+          sleep 30
+
+      - name: Run integration tests
+        run: |
+          # Start agents in background
+          npm start &
+          AGENT_PID=$!
+          
+          # Wait for agents to start
+          sleep 45
+          
+          # Test agent endpoints
+          echo "Testing Architect Agent..."
+          curl -f http://localhost:5001/health || exit 1
+          
+          echo "Testing Developer Agent..."  
+          curl -f http://localhost:5002/health || exit 1
+          
+          echo "Testing DevOps Agent..."
+          curl -f http://localhost:5003/health || exit 1
+          
+          echo "Testing QA Agent..."
+          curl -f http://localhost:5004/health || exit 1
+          
+          echo "Testing Manager Agent..."
+          curl -f http://localhost:5005/health || exit 1
+          
+          echo "Testing Chat Interface..."
+          curl -f http://localhost:7000/health || exit 1
+          
+          # Test agent communication
+          echo "Testing agent task assignment..."
+          curl -X POST -H "Content-Type: application/json" \
+            -d '{"taskId": "test-123", "task": "Test task", "priority": "medium", "context": {}}' \
+            http://localhost:5001/agent/ai-architect-agent-1/task || exit 1
+          
+          # Clean up
+          kill $AGENT_PID || true
+          
+        timeout-minutes: 10
+
+      - name: Stop services
+        if: always()
+        run: docker-compose down
+
+  # Security and Vulnerability Scanning
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level moderate
+
+      - name: Run Semgrep Security Scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+          generateSarif: "1"
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+  # Performance Benchmarks
+  performance:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[perf]')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start application
+        run: |
+          npm start &
+          sleep 45  # Wait for all agents to start
+
+      - name: Run performance benchmarks
+        run: |
+          # Install artillery for load testing
+          npm install -g artillery@latest
+          
+          # Create basic load test config
+          cat > load-test.yml << EOF
+          config:
+            target: 'http://localhost:5001'
+            phases:
+              - duration: 60
+                arrivalRate: 5
+          scenarios:
+            - name: "Health check load test"
+              requests:
+                - get:
+                    url: "/health"
+                - get:
+                    url: "/agent/ai-architect-agent-1/status"
+          EOF
+          
+          # Run load test
+          artillery run load-test.yml
+
+      - name: Benchmark results
+        run: |
+          echo "Performance benchmark completed"
+          # In a real scenario, you'd store these results somewhere
+
+  # Code Quality Analysis
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint with reporting
+        run: |
+          npx eslint src/**/*.ts --format json --output-file eslint-results.json || true
+          npx eslint src/**/*.ts --format stylish || true
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        if: env.SONAR_TOKEN != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Upload ESLint results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eslint-results
+          path: eslint-results.json
+
+  # Dependency Analysis
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for outdated packages
+        run: npm outdated || true
+
+      - name: Generate dependency graph
+        run: npm list --all > dependency-tree.txt || true
+
+      - name: Check bundle size
+        run: |
+          npm run build
+          du -sh dist/ > bundle-size.txt
+          echo "Bundle size:"
+          cat bundle-size.txt
+
+      - name: Upload dependency analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-analysis
+          path: |
+            dependency-tree.txt
+            bundle-size.txt
+
+  # Test Summary
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [test, docker-test, integration, security, quality, dependencies]
+    if: always()
+    steps:
+      - name: Generate test summary
+        run: |
+          echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ **Unit Tests:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Unit Tests:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.docker-test.result }}" == "success" ]; then
+            echo "✅ **Docker Build:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Docker Build:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.integration.result }}" == "success" ]; then
+            echo "✅ **Integration Tests:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Integration Tests:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.security.result }}" == "success" ]; then
+            echo "✅ **Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Security Scan:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.quality.result }}" == "success" ]; then
+            echo "✅ **Code Quality:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Code Quality:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
