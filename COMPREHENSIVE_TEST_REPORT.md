@@ -153,7 +153,7 @@
 ./scripts/verify-deployment.sh dev
 
 # Run regression tests against deployed system  
-node regression-test.js --url https://agents.dev.visualforge.ai
+node regression-test.js --url https://dev.agents.visualforge.ai
 ```
 
 ### **Phase 3: Integration Testing** (Manual/Automated)

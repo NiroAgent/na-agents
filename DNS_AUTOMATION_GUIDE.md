@@ -7,8 +7,8 @@
 The NA-Agents system uses automated DNS configuration to set up secure subdomain isolation:
 
 ```
-agents.dev.visualforge.ai     # Development environment
-agents.stg.visualforge.ai     # Staging environment  
+dev.agents.visualforge.ai     # Development environment
+stg.agents.visualforge.ai     # Staging environment  
 agents.visualforge.ai         # Production environment
 ```
 

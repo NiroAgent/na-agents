@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DNS Records for NA-Agents - uses existing visualforge.ai infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, stg, prd]
+    Description: Environment name (dev, stg, prd)
+  
+  LoadBalancerDNS:
+    Type: String
+    Description: Load balancer DNS name from main infrastructure stack
+  
+  LoadBalancerHostedZoneId:
+    Type: String
+    Description: Load balancer hosted zone ID for alias records
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prd]
+
+Resources:
+  # Main agents subdomain record
+  AgentsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: 'visualforge.ai.'
+      Name: !If
+        - IsProduction
+        - 'agents.visualforge.ai'
+        - !Sub '${Environment}.agents.visualforge.ai'
+      Type: A
+      AliasTarget:
+        DNSName: !Ref LoadBalancerDNS
+        HostedZoneId: !Ref LoadBalancerHostedZoneId
+        EvaluateTargetHealth: true
+      Comment: !Sub 'NA-Agents ${Environment} environment load balancer alias'
+
+  # Wildcard record for agent services (*.agents.env.visualforge.ai)
+  AgentsWildcardRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: 'visualforge.ai.'
+      Name: !If
+        - IsProduction
+        - '*.agents.visualforge.ai'
+        - !Sub '*.${Environment}.agents.visualforge.ai'
+      Type: A
+      AliasTarget:
+        DNSName: !Ref LoadBalancerDNS
+        HostedZoneId: !Ref LoadBalancerHostedZoneId
+        EvaluateTargetHealth: true
+      Comment: !Sub 'NA-Agents ${Environment} wildcard for individual agent services'
+
+Outputs:
+  AgentsDomainName:
+    Description: Full domain name for NA-Agents
+    Value: !If
+      - IsProduction
+      - 'agents.visualforge.ai'
+      - !Sub '${Environment}.agents.visualforge.ai'
+    Export:
+      Name: !Sub '${AWS::StackName}-AgentsDomainName'
+
+  AgentsWildcardDomainName:
+    Description: Wildcard domain name for individual agents
+    Value: !If
+      - IsProduction
+      - '*.agents.visualforge.ai'
+      - !Sub '*.${Environment}.agents.visualforge.ai'
+    Export:
+      Name: !Sub '${AWS::StackName}-AgentsWildcardDomainName'

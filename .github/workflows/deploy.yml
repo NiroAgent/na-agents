@@ -175,7 +175,7 @@ jobs:
     if: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || inputs.environment == 'dev') && (!failure() || inputs.force_deploy) }}
     environment:
       name: dev
-      url: https://agents.dev.visualforge.ai
+      url: https://dev.agents.visualforge.ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -192,7 +192,7 @@ jobs:
         run: |
           # Make deployment script executable
           chmod +x deploy-to-aws.sh
-          chmod +x scripts/setup-dns.sh
+          chmod +x scripts/setup-agents-dns.sh
           
           # Set environment variables
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_DEV }}
@@ -201,9 +201,9 @@ jobs:
           # Run main infrastructure deployment
           ./deploy-to-aws.sh dev
           
-          # Deploy DNS configuration
-          echo "🌐 Setting up DNS configuration for dev environment..."
-          ./scripts/setup-dns.sh dev visualforge.ai false
+          # Deploy agents DNS records to existing visualforge.ai infrastructure
+          echo "🌐 Setting up agents DNS records for dev environment..."
+          ./scripts/setup-agents-dns.sh dev
           
           # Get load balancer URL
           LB_URL=$(aws cloudformation describe-stacks \
@@ -297,7 +297,7 @@ jobs:
     if: ${{ (github.ref == 'refs/heads/main' || inputs.environment == 'stg') && (!failure() || inputs.force_deploy) }}
     environment:
       name: stg
-      url: https://agents.stg.visualforge.ai
+      url: https://stg.agents.visualforge.ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -313,16 +313,16 @@ jobs:
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
-          chmod +x scripts/setup-dns.sh
+          chmod +x scripts/setup-agents-dns.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_STG }}
           export IMAGE_TAG=${{ github.sha }}
           
           # Run main infrastructure deployment
           ./deploy-to-aws.sh stg
           
-          # Deploy DNS configuration
-          echo "🌐 Setting up DNS configuration for stg environment..."
-          ./scripts/setup-dns.sh stg visualforge.ai false
+          # Deploy agents DNS records to existing visualforge.ai infrastructure
+          echo "🌐 Setting up agents DNS records for stg environment..."
+          ./scripts/setup-agents-dns.sh stg
           
           LB_URL=$(aws cloudformation describe-stacks \
             --stack-name na-agents-stg \
@@ -378,16 +378,16 @@ jobs:
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
-          chmod +x scripts/setup-dns.sh
+          chmod +x scripts/setup-agents-dns.sh
           export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_PRD }}
           export IMAGE_TAG=${{ github.sha }}
           
           # Run main infrastructure deployment
           ./deploy-to-aws.sh prd
           
-          # Deploy DNS configuration
-          echo "🌐 Setting up DNS configuration for prd environment..."
-          ./scripts/setup-dns.sh prd visualforge.ai false
+          # Deploy agents DNS records to existing visualforge.ai infrastructure
+          echo "🌐 Setting up agents DNS records for prd environment..."
+          ./scripts/setup-agents-dns.sh prd
           
           LB_URL=$(aws cloudformation describe-stacks \
             --stack-name na-agents-prd \
