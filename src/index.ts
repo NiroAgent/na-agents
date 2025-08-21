@@ -4,6 +4,8 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import dotenv from 'dotenv';
+import { githubService } from './services/github-service';
+import { chatInterface } from './services/chat-interface';
 
 // Load environment variables
 dotenv.config();
@@ -72,6 +74,20 @@ class MultiAgentSystem {
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
+
+    // Start GitHub integration service
+    if (process.env.GITHUB_TOKEN) {
+      console.log('Starting GitHub Integration Service...');
+      await githubService.start();
+      console.log('✓ GitHub Integration Service started on port 6000');
+    } else {
+      console.log('⚠️  GitHub Integration Service skipped (GITHUB_TOKEN not provided)');
+    }
+
+    // Start Chat Interface Service
+    console.log('Starting Chat Interface Service...');
+    await chatInterface.start();
+    console.log('✓ Chat Interface Service started on port 7000');
 
     // Start each agent with a delay to avoid port conflicts
     for (const [type, agent] of this.agents) {
@@ -173,9 +189,14 @@ class MultiAgentSystem {
     
     console.log('='.repeat(60));
     console.log('');
-    console.log('Dashboard: ' + (process.env.DASHBOARD_URL || 'http://localhost:4001'));
+    console.log('🌐 SERVICES:');
+    console.log('Dashboard:     ' + (process.env.DASHBOARD_URL || 'http://localhost:4001'));
+    console.log('Chat UI:       http://localhost:7000');
+    if (process.env.GITHUB_TOKEN) {
+      console.log('GitHub Webhook: http://localhost:6000/webhook');
+    }
     console.log('');
-    console.log('Press Ctrl+C to stop all agents');
+    console.log('Press Ctrl+C to stop all agents and services');
   }
 
   private async shutdown(): Promise<void> {
@@ -183,6 +204,10 @@ class MultiAgentSystem {
     
     this.isShuttingDown = true;
     console.log('\n⏹️  Shutting down Multi-Agent System...');
+
+    // Stop services
+    console.log('Stopping Chat Interface Service...');
+    await chatInterface.stop().catch(console.error);
 
     // Stop all agents
     for (const [type, agent] of this.agents) {
