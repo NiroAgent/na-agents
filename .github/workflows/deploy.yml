@@ -205,6 +205,11 @@ jobs:
           echo "🌐 Setting up agents DNS records for dev environment..."
           ./scripts/setup-agents-dns.sh dev
           
+          # Deploy security configuration
+          echo "🔒 Setting up security (WAF, API keys, rate limiting)..."
+          chmod +x scripts/setup-security.sh
+          ./scripts/setup-security.sh dev
+          
           # Get load balancer URL
           LB_URL=$(aws cloudformation describe-stacks \
             --stack-name na-agents-dev \

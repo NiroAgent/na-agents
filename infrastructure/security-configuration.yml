@@ -1,0 +1,285 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Security Configuration for NA-Agents - WAF, API Keys, Rate Limiting'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, stg, prd]
+    Description: Environment name (dev, stg, prd)
+  
+  LoadBalancerArn:
+    Type: String
+    Description: Load balancer ARN from main infrastructure stack
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prd]
+
+Resources:
+  # WAF Web ACL for API protection
+  AgentsWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub 'na-agents-waf-${Environment}'
+      Description: !Sub 'WAF protection for NA-Agents ${Environment}'
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      Rules:
+        # Rate limiting rule
+        - Name: RateLimitRule
+          Priority: 1
+          Statement:
+            RateBasedStatement:
+              Limit: !If [IsProduction, 1000, 2000]  # Lower limit for production
+              AggregateKeyType: IP
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'RateLimit-${Environment}'
+
+        # Block common attack patterns
+        - Name: SQLInjectionRule
+          Priority: 2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'SQLInjection-${Environment}'
+
+        # Block known bad inputs
+        - Name: KnownBadInputsRule
+          Priority: 3
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'KnownBadInputs-${Environment}'
+
+        # Core rule set
+        - Name: CoreRuleSet
+          Priority: 4
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+              ExcludedRules:
+                - Name: GenericRFI_BODY
+                - Name: GenericRFI_QUERYARGUMENTS
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'CoreRuleSet-${Environment}'
+
+        # IP reputation rule
+        - Name: AmazonIpReputationList
+          Priority: 5
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'IpReputation-${Environment}'
+
+        # Geographic blocking (if needed)
+        - Name: GeoBlockRule
+          Priority: 6
+          Statement:
+            GeoMatchStatement:
+              CountryCodes:
+                - CN  # Block China
+                - RU  # Block Russia
+                - KP  # Block North Korea
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'GeoBlock-${Environment}'
+
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub 'AgentsWebACL-${Environment}'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: NA-Agents
+
+  # Associate WAF with Load Balancer
+  WebACLAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Ref LoadBalancerArn
+      WebACLArn: !GetAtt AgentsWebACL.Arn
+
+  # API Key for agent authentication
+  AgentsApiKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub 'na-agents-api-key-${Environment}'
+      Description: !Sub 'API key for NA-Agents ${Environment}'
+      GenerateSecretString:
+        SecretStringTemplate: '{"apiKeyName": "na-agents"}'
+        GenerateStringKey: 'apiKey'
+        PasswordLength: 64
+        ExcludeCharacters: '"@/\'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: NA-Agents
+
+  # API key for GitHub integration
+  GitHubApiKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub 'na-agents-github-api-key-${Environment}'
+      Description: !Sub 'GitHub API key for NA-Agents ${Environment}'
+      SecretString: !Sub |
+        {
+          "githubToken": "PLACEHOLDER_REPLACE_WITH_ACTUAL_TOKEN",
+          "webhookSecret": "PLACEHOLDER_REPLACE_WITH_WEBHOOK_SECRET"
+        }
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: NA-Agents
+
+  # CloudWatch Log Group for security events
+  SecurityLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/waf/na-agents-${Environment}'
+      RetentionInDays: !If [IsProduction, 90, 30]
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: NA-Agents
+
+  # WAF Logging Configuration
+  WAFLoggingConfig:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt AgentsWebACL.Arn
+      LogDestinationConfigs:
+        - !GetAtt SecurityLogGroup.Arn
+      LoggingFilter:
+        DefaultBehavior: KEEP
+        Filters:
+          - Behavior: KEEP
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
+            Requirement: MEETS_ANY
+
+  # CloudWatch Alarms for security monitoring
+  HighRequestRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'NA-Agents-HighRequestRate-${Environment}'
+      AlarmDescription: 'High request rate detected'
+      MetricName: !Sub 'RateLimit-${Environment}'
+      Namespace: AWS/WAFV2
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 100
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Security group for additional protection
+  AgentsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'na-agents-sg-${Environment}'
+      GroupDescription: !Sub 'Security group for NA-Agents ${Environment}'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # HTTPS only
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTPS access'
+        # Agent ports (restricted to load balancer)
+        - IpProtocol: tcp
+          FromPort: 5001
+          ToPort: 5005
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+          Description: 'Agent ports from load balancer'
+      SecurityGroupEgress:
+        # Allow HTTPS outbound for API calls
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTPS outbound'
+        # Allow HTTP for health checks
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTP outbound'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: NA-Agents
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for security group
+  
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Load balancer security group ID
+
+Outputs:
+  WebACLArn:
+    Description: WAF Web ACL ARN
+    Value: !GetAtt AgentsWebACL.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-WebACLArn'
+
+  AgentsApiKeyArn:
+    Description: Agents API Key ARN
+    Value: !Ref AgentsApiKey
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiKeyArn'
+
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref AgentsSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+
+  SecurityLogGroupName:
+    Description: Security log group name
+    Value: !Ref SecurityLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityLogGroup'
