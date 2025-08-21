@@ -175,7 +175,7 @@ jobs:
     if: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || inputs.environment == 'dev') && (!failure() || inputs.force_deploy) }}
     environment:
       name: dev
-      url: https://dev-agents.niroagent.com
+      url: https://dev.visualforge.ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -292,7 +292,7 @@ jobs:
     if: ${{ (github.ref == 'refs/heads/main' || inputs.environment == 'stg') && (!failure() || inputs.force_deploy) }}
     environment:
       name: stg
-      url: https://stg-agents.niroagent.com
+      url: https://stg.visualforge.ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -350,7 +350,7 @@ jobs:
     if: ${{ inputs.environment == 'prd' && (!failure() || inputs.force_deploy) }}
     environment:
       name: prd
-      url: https://agents.niroagent.com
+      url: https://visualforge.ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -131,7 +131,7 @@ determine_base_url() {
                 fi
                 ;;
             "prd")
-                BASE_URL="https://agents.niroagent.com"
+                BASE_URL="https://visualforge.ai"
                 ;;
             *)
                 echo -e "${RED}❌ Unknown environment: $ENVIRONMENT${NC}"

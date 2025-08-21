@@ -183,7 +183,7 @@ jobs:
     if: ${{ !inputs.prerelease }}
     environment:
       name: production
-      url: https://agents.niroagent.com
+      url: https://visualforge.ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

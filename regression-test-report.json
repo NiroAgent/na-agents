@@ -6,15 +6,15 @@
     "failed": 37,
     "passRate": "0.00"
   },
-  "executedAt": "2025-08-21T17:35:56.968Z",
-  "duration": "4.14s",
+  "executedAt": "2025-08-21T18:57:24.745Z",
+  "duration": "73.69s",
   "environment": "local",
   "testSuite": "regression-test-suite",
   "results": [
     {
       "test": "Architect Health Check",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.879Z",
+      "timestamp": "2025-08-21T18:56:12.189Z",
       "details": {
         "error": ""
       }
@@ -22,7 +22,7 @@
     {
       "test": "Developer Health Check",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.881Z",
+      "timestamp": "2025-08-21T18:56:13.238Z",
       "details": {
         "error": ""
       }
@@ -30,7 +30,7 @@
     {
       "test": "DevOps Health Check",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.882Z",
+      "timestamp": "2025-08-21T18:56:14.286Z",
       "details": {
         "error": ""
       }
@@ -38,7 +38,7 @@
     {
       "test": "QA Health Check",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.883Z",
+      "timestamp": "2025-08-21T18:56:15.335Z",
       "details": {
         "error": ""
       }
@@ -46,7 +46,7 @@
     {
       "test": "Manager Health Check",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.884Z",
+      "timestamp": "2025-08-21T18:56:16.387Z",
       "details": {
         "error": ""
       }
@@ -54,7 +54,7 @@
     {
       "test": "Architect Status Endpoint",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.885Z",
+      "timestamp": "2025-08-21T18:56:17.441Z",
       "details": {
         "error": ""
       }
@@ -62,7 +62,7 @@
     {
       "test": "Developer Status Endpoint",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.886Z",
+      "timestamp": "2025-08-21T18:56:18.489Z",
       "details": {
         "error": ""
       }
@@ -70,7 +70,7 @@
     {
       "test": "DevOps Status Endpoint",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.887Z",
+      "timestamp": "2025-08-21T18:56:19.540Z",
       "details": {
         "error": ""
       }
@@ -78,7 +78,7 @@
     {
       "test": "QA Status Endpoint",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.888Z",
+      "timestamp": "2025-08-21T18:56:20.594Z",
       "details": {
         "error": ""
       }
@@ -86,7 +86,7 @@
     {
       "test": "Manager Status Endpoint",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.889Z",
+      "timestamp": "2025-08-21T18:56:21.664Z",
       "details": {
         "error": ""
       }
@@ -94,7 +94,7 @@
     {
       "test": "Architect Task Processing",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.891Z",
+      "timestamp": "2025-08-21T18:56:22.714Z",
       "details": {
         "error": ""
       }
@@ -102,7 +102,7 @@
     {
       "test": "Developer Task Processing",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.892Z",
+      "timestamp": "2025-08-21T18:56:23.763Z",
       "details": {
         "error": ""
       }
@@ -110,7 +110,7 @@
     {
       "test": "DevOps Task Processing",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.892Z",
+      "timestamp": "2025-08-21T18:56:24.808Z",
       "details": {
         "error": ""
       }
@@ -118,7 +118,7 @@
     {
       "test": "QA Task Processing",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.893Z",
+      "timestamp": "2025-08-21T18:56:25.854Z",
       "details": {
         "error": ""
       }
@@ -126,7 +126,7 @@
     {
       "test": "Manager Task Processing",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.894Z",
+      "timestamp": "2025-08-21T18:56:26.912Z",
       "details": {
         "error": ""
       }
@@ -134,7 +134,7 @@
     {
       "test": "Architect Message Handling",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.895Z",
+      "timestamp": "2025-08-21T18:56:27.941Z",
       "details": {
         "error": ""
       }
@@ -142,7 +142,7 @@
     {
       "test": "Developer Message Handling",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.895Z",
+      "timestamp": "2025-08-21T18:56:28.999Z",
       "details": {
         "error": ""
       }
@@ -150,7 +150,7 @@
     {
       "test": "DevOps Message Handling",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.896Z",
+      "timestamp": "2025-08-21T18:56:30.030Z",
       "details": {
         "error": ""
       }
@@ -158,7 +158,7 @@
     {
       "test": "QA Message Handling",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.897Z",
+      "timestamp": "2025-08-21T18:56:31.089Z",
       "details": {
         "error": ""
       }
@@ -166,7 +166,7 @@
     {
       "test": "Manager Message Handling",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.897Z",
+      "timestamp": "2025-08-21T18:56:32.149Z",
       "details": {
         "error": ""
       }
@@ -174,7 +174,7 @@
     {
       "test": "Architect Conversation History",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.898Z",
+      "timestamp": "2025-08-21T18:56:33.210Z",
       "details": {
         "error": ""
       }
@@ -182,7 +182,7 @@
     {
       "test": "Developer Conversation History",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.898Z",
+      "timestamp": "2025-08-21T18:56:34.244Z",
       "details": {
         "error": ""
       }
@@ -190,7 +190,7 @@
     {
       "test": "DevOps Conversation History",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.899Z",
+      "timestamp": "2025-08-21T18:56:35.308Z",
       "details": {
         "error": ""
       }
@@ -198,7 +198,7 @@
     {
       "test": "QA Conversation History",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.900Z",
+      "timestamp": "2025-08-21T18:56:36.365Z",
       "details": {
         "error": ""
       }
@@ -206,7 +206,7 @@
     {
       "test": "Manager Conversation History",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.900Z",
+      "timestamp": "2025-08-21T18:56:37.399Z",
       "details": {
         "error": ""
       }
@@ -214,7 +214,7 @@
     {
       "test": "Chat Interface Service",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.901Z",
+      "timestamp": "2025-08-21T18:56:38.430Z",
       "details": {
         "error": ""
       }
@@ -222,7 +222,7 @@
     {
       "test": "GitHub Service Service",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.901Z",
+      "timestamp": "2025-08-21T18:56:39.486Z",
       "details": {
         "error": ""
       }
@@ -230,7 +230,7 @@
     {
       "test": "Chat Interface UI",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.902Z",
+      "timestamp": "2025-08-21T18:56:40.542Z",
       "details": {
         "error": ""
       }
@@ -238,7 +238,7 @@
     {
       "test": "Inter-Agent Communication",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.903Z",
+      "timestamp": "2025-08-21T18:56:41.596Z",
       "details": {
         "error": ""
       }
@@ -246,25 +246,25 @@
     {
       "test": "Invalid Task Format",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.904Z",
+      "timestamp": "2025-08-21T18:56:42.652Z",
       "details": {}
     },
     {
       "test": "Non-existent Endpoint",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.905Z",
+      "timestamp": "2025-08-21T18:56:43.706Z",
       "details": {}
     },
     {
       "test": "Invalid Agent ID",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.905Z",
+      "timestamp": "2025-08-21T18:56:44.758Z",
       "details": {}
     },
     {
       "test": "Architect Security Headers",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.906Z",
+      "timestamp": "2025-08-21T18:56:45.804Z",
       "details": {
         "error": ""
       }
@@ -272,7 +272,7 @@
     {
       "test": "Developer Security Headers",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.907Z",
+      "timestamp": "2025-08-21T18:56:46.853Z",
       "details": {
         "error": ""
       }
@@ -280,20 +280,20 @@
     {
       "test": "Load Performance Test",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.932Z",
+      "timestamp": "2025-08-21T18:56:48.049Z",
       "details": {
         "totalRequests": 100,
         "successful": 0,
         "failed": 100,
-        "duration": "25ms",
+        "duration": "1196ms",
         "passRate": "0.00%",
-        "requestsPerSecond": 4000
+        "requestsPerSecond": 84
       }
     },
     {
       "test": "Concurrent Task Handling",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:52.935Z",
+      "timestamp": "2025-08-21T18:56:49.100Z",
       "details": {
         "totalAgents": 5,
         "successful": 0,
@@ -329,7 +329,7 @@
     {
       "test": "System Resource Usage",
       "status": "WARN",
-      "timestamp": "2025-08-21T17:35:52.938Z",
+      "timestamp": "2025-08-21T18:56:54.363Z",
       "details": {
         "averageResponseTime": "NaNms",
         "tests": [
@@ -369,7 +369,7 @@
     {
       "test": "Health Check Stability",
       "status": "FAIL",
-      "timestamp": "2025-08-21T17:35:56.967Z",
+      "timestamp": "2025-08-21T18:57:24.744Z",
       "details": {
         "averageStability": "0.00%",
         "agentStability": [

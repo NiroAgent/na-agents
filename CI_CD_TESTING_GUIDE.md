@@ -87,9 +87,9 @@ npm run test:coverage      # Generate test coverage report
 
 ### **Environment-Specific Testing**
 ```bash
-npm run test:regression:dev   # Test dev environment (70% threshold)
-npm run test:regression:stg   # Test staging (80% threshold)  
-npm run test:regression:prd   # Test production (95% threshold)
+npm run test:regression:dev   # Test dev.visualforge.ai (70% threshold)
+npm run test:regression:stg   # Test stg.visualforge.ai (80% threshold)  
+npm run test:regression:prd   # Test visualforge.ai (95% threshold)
 ```
 
 ### **Manual Testing Against Custom URLs**
