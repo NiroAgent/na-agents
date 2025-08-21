@@ -1,0 +1,400 @@
+{
+  "summary": {
+    "total": 38,
+    "passed": 0,
+    "warnings": 1,
+    "failed": 37,
+    "passRate": "0.00"
+  },
+  "executedAt": "2025-08-21T17:35:56.968Z",
+  "duration": "4.14s",
+  "environment": "local",
+  "testSuite": "regression-test-suite",
+  "results": [
+    {
+      "test": "Architect Health Check",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.879Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Developer Health Check",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.881Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "DevOps Health Check",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.882Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "QA Health Check",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.883Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Manager Health Check",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.884Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Architect Status Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.885Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Developer Status Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.886Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "DevOps Status Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.887Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "QA Status Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.888Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Manager Status Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.889Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Architect Task Processing",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.891Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Developer Task Processing",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.892Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "DevOps Task Processing",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.892Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "QA Task Processing",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.893Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Manager Task Processing",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.894Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Architect Message Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.895Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Developer Message Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.895Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "DevOps Message Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.896Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "QA Message Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.897Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Manager Message Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.897Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Architect Conversation History",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.898Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Developer Conversation History",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.898Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "DevOps Conversation History",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.899Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "QA Conversation History",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.900Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Manager Conversation History",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.900Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Chat Interface Service",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.901Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "GitHub Service Service",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.901Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Chat Interface UI",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.902Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Inter-Agent Communication",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.903Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Invalid Task Format",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.904Z",
+      "details": {}
+    },
+    {
+      "test": "Non-existent Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.905Z",
+      "details": {}
+    },
+    {
+      "test": "Invalid Agent ID",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.905Z",
+      "details": {}
+    },
+    {
+      "test": "Architect Security Headers",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.906Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Developer Security Headers",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.907Z",
+      "details": {
+        "error": ""
+      }
+    },
+    {
+      "test": "Load Performance Test",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.932Z",
+      "details": {
+        "totalRequests": 100,
+        "successful": 0,
+        "failed": 100,
+        "duration": "25ms",
+        "passRate": "0.00%",
+        "requestsPerSecond": 4000
+      }
+    },
+    {
+      "test": "Concurrent Task Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:52.935Z",
+      "details": {
+        "totalAgents": 5,
+        "successful": 0,
+        "results": [
+          {
+            "success": false,
+            "agent": "Architect",
+            "error": ""
+          },
+          {
+            "success": false,
+            "agent": "Developer",
+            "error": ""
+          },
+          {
+            "success": false,
+            "agent": "DevOps",
+            "error": ""
+          },
+          {
+            "success": false,
+            "agent": "QA",
+            "error": ""
+          },
+          {
+            "success": false,
+            "agent": "Manager",
+            "error": ""
+          }
+        ]
+      }
+    },
+    {
+      "test": "System Resource Usage",
+      "status": "WARN",
+      "timestamp": "2025-08-21T17:35:52.938Z",
+      "details": {
+        "averageResponseTime": "NaNms",
+        "tests": [
+          {
+            "agent": "Architect",
+            "responseTime": -1,
+            "healthy": false,
+            "error": ""
+          },
+          {
+            "agent": "Developer",
+            "responseTime": -1,
+            "healthy": false,
+            "error": ""
+          },
+          {
+            "agent": "DevOps",
+            "responseTime": -1,
+            "healthy": false,
+            "error": ""
+          },
+          {
+            "agent": "QA",
+            "responseTime": -1,
+            "healthy": false,
+            "error": ""
+          },
+          {
+            "agent": "Manager",
+            "responseTime": -1,
+            "healthy": false,
+            "error": ""
+          }
+        ]
+      }
+    },
+    {
+      "test": "Health Check Stability",
+      "status": "FAIL",
+      "timestamp": "2025-08-21T17:35:56.967Z",
+      "details": {
+        "averageStability": "0.00%",
+        "agentStability": [
+          {
+            "agent": "Architect",
+            "stability": 0
+          },
+          {
+            "agent": "Developer",
+            "stability": 0
+          },
+          {
+            "agent": "DevOps",
+            "stability": 0
+          },
+          {
+            "agent": "QA",
+            "stability": 0
+          },
+          {
+            "agent": "Manager",
+            "stability": 0
+          }
+        ]
+      }
+    }
+  ]
+}
