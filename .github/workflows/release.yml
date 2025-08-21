@@ -1,0 +1,377 @@
+name: Release Management
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18.x'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  # Create Release
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release-version: ${{ steps.version.outputs.version }}
+      release-tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: |
+          npm run build
+          npm run typecheck
+          npm run lint
+          npm test
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --oneline --pretty=format:"* %s (%h)" HEAD)
+          else
+            COMMITS=$(git log --oneline --pretty=format:"* %s (%h)" $LAST_TAG..HEAD)
+          fi
+          
+          # Create changelog
+          cat > CHANGELOG.md << EOF
+          # Release ${{ steps.version.outputs.version }}
+          
+          ## What's New
+          
+          $COMMITS
+          
+          ## Deployment Information
+          
+          - **Docker Image:** \`${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/na-agents:${{ steps.version.outputs.version }}\`
+          - **Compatibility:** Node.js 18+
+          - **Breaking Changes:** None
+          
+          ## Installation
+          
+          \`\`\`bash
+          # Docker
+          docker pull ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/na-agents:${{ steps.version.outputs.version }}
+          
+          # NPM (for development)
+          git clone https://github.com/NiroAgent/na-agents.git
+          cd na-agents
+          git checkout ${{ steps.version.outputs.version }}
+          npm install
+          npm run build
+          npm start
+          \`\`\`
+          
+          ## Full Changelog
+          
+          View the full changelog at: https://github.com/NiroAgent/na-agents/compare/$LAST_TAG...${{ steps.version.outputs.version }}
+          EOF
+          
+          echo "changelog-file=CHANGELOG.md" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: NA-Agents ${{ steps.version.outputs.version }}
+          body_path: ${{ steps.changelog.outputs.changelog-file }}
+          draft: false
+          prerelease: ${{ inputs.prerelease || false }}
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+
+  # Build and Push Release Docker Image
+  build-release:
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push release image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/na-agents:${{ needs.create-release.outputs.release-version }}
+            ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/na-agents:stable
+          labels: |
+            org.opencontainers.image.title=NA-Agents
+            org.opencontainers.image.description=Multi-Agent AI System
+            org.opencontainers.image.version=${{ needs.create-release.outputs.release-version }}
+            org.opencontainers.image.source=https://github.com/NiroAgent/na-agents
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [create-release, build-release]
+    if: ${{ !inputs.prerelease }}
+    environment:
+      name: production
+      url: https://agents.niroagent.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to production
+        run: |
+          chmod +x deploy-to-aws.sh
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export IMAGE_TAG=${{ needs.create-release.outputs.release-version }}
+          ./deploy-to-aws.sh production
+
+      - name: Production smoke test
+        run: |
+          # Get load balancer URL
+          LB_URL=$(aws cloudformation describe-stacks \
+            --stack-name na-agents-production \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+            --output text)
+          
+          echo "Testing production deployment at: http://$LB_URL"
+          
+          # Wait for deployment
+          for i in {1..60}; do
+            if curl -f -s http://$LB_URL/health > /dev/null; then
+              echo "Production is ready!"
+              break
+            fi
+            echo "Waiting for production... ($i/60)"
+            sleep 10
+          done
+          
+          # Test all agents
+          for port in 5001 5002 5003 5004 5005; do
+            curl -f http://$LB_URL:$port/health || exit 1
+          done
+          
+          echo "Production deployment successful!"
+
+  # Update Documentation
+  update-docs:
+    runs-on: ubuntu-latest
+    needs: [create-release, deploy-production]
+    if: always() && needs.create-release.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in package.json
+        run: |
+          VERSION="${{ needs.create-release.outputs.release-version }}"
+          VERSION_NUMBER=${VERSION#v}  # Remove 'v' prefix
+          
+          # Update package.json
+          npm version $VERSION_NUMBER --no-git-tag-version
+          
+          # Update README with new version
+          sed -i "s/Version: .*/Version: $VERSION/" README.md || true
+          
+          # Update CLAUDE.md
+          sed -i "s/\*Last Updated: .*/\*Last Updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)\*/" CLAUDE.md
+
+      - name: Commit version updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json README.md CLAUDE.md
+          git commit -m "chore: bump version to ${{ needs.create-release.outputs.release-version }}" || true
+          git push || true
+
+  # Create GitHub Pages Documentation
+  docs:
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Generate API documentation
+        run: |
+          npm ci
+          
+          # Create docs directory
+          mkdir -p docs/api
+          
+          # Generate TypeScript documentation (if typedoc is available)
+          npx typedoc --out docs/api src/ || echo "TypeDoc not available, skipping API docs"
+          
+          # Copy main documentation files
+          cp README.md docs/
+          cp CLAUDE.md docs/
+          cp -r .github/workflows docs/workflows
+          
+          # Create index page
+          cat > docs/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>NA-Agents Documentation</title>
+              <style>
+                  body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+                  .nav { background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+                  .nav a { margin-right: 15px; text-decoration: none; color: #0066cc; }
+                  .nav a:hover { text-decoration: underline; }
+              </style>
+          </head>
+          <body>
+              <h1>🤖 NA-Agents Documentation</h1>
+              <div class="nav">
+                  <a href="README.md">README</a>
+                  <a href="CLAUDE.md">Technical Documentation</a>
+                  <a href="api/">API Documentation</a>
+                  <a href="workflows/">GitHub Workflows</a>
+              </div>
+              <h2>Multi-Agent AI System</h2>
+              <p>Welcome to the NA-Agents documentation. This system provides a comprehensive multi-agent AI platform with:</p>
+              <ul>
+                  <li>🏗️ Architect Agent - System design and architecture</li>
+                  <li>👨‍💻 Developer Agent - Code generation and implementation</li>
+                  <li>🚀 DevOps Agent - Deployment and infrastructure</li>
+                  <li>🧪 QA Agent - Testing and quality assurance</li>
+                  <li>📊 Manager Agent - Project coordination</li>
+              </ul>
+              <h2>Quick Links</h2>
+              <ul>
+                  <li><a href="https://github.com/NiroAgent/na-agents">GitHub Repository</a></li>
+                  <li><a href="https://github.com/NiroAgent/na-agents/releases">Releases</a></li>
+                  <li><a href="https://github.com/NiroAgent/na-agents/issues">Issues</a></li>
+              </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+
+  # Notification
+  notify-release:
+    runs-on: ubuntu-latest
+    needs: [create-release, build-release, deploy-production, update-docs]
+    if: always()
+    steps:
+      - name: Release Summary
+        run: |
+          echo "## 🎉 Release ${{ needs.create-release.outputs.release-version }} Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.create-release.outputs.release-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Pre-release:** ${{ inputs.prerelease || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build-release.result }}" == "success" ]; then
+            echo "✅ **Docker Build:** Success" >> $GITHUB_STEP_SUMMARY
+            echo "📦 **Image:** \`${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/na-agents:${{ needs.create-release.outputs.release-version }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Docker Build:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
+            echo "✅ **Production Deployment:** Success" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-production.result }}" == "skipped" ]; then
+            echo "⏭️ **Production Deployment:** Skipped (pre-release)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Production Deployment:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.update-docs.result }}" == "success" ]; then
+            echo "✅ **Documentation:** Updated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Documentation:** Update failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Release](https://github.com/NiroAgent/na-agents/releases/tag/${{ needs.create-release.outputs.release-version }})" >> $GITHUB_STEP_SUMMARY
