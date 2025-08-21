@@ -259,7 +259,7 @@ jobs:
           
           # Run regression tests against deployed system
           DEPLOYMENT_URL="${{ steps.deploy.outputs.deployment-url }}" node -e "
-            const RegressionTester = require('./regression-test.js');
+            const RegressionTester = require('./tests/regression-test.js');
             const tester = new RegressionTester();
             
             // Update base URLs to use deployment URL
