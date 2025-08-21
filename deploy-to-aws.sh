@@ -31,9 +31,15 @@ command -v docker >/dev/null 2>&1 || { echo "❌ Docker is required but not inst
 echo "🔐 Checking AWS credentials..."
 aws sts get-caller-identity > /dev/null || { echo "❌ AWS credentials not configured properly."; exit 1; }
 
-# Get AWS Account ID
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+# Get AWS Account ID if not provided
+if [ -z "${AWS_ACCOUNT_ID}" ]; then
+    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+fi
 echo "📋 AWS Account ID: ${AWS_ACCOUNT_ID}"
+echo "🌍 Target Environment: ${ENVIRONMENT}"
+
+# Update ECR registry with the correct account ID
+ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
 # Build and push Docker image
 echo ""

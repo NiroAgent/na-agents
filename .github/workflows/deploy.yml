@@ -32,7 +32,6 @@ on:
 env:
   NODE_VERSION: '18.x'
   AWS_REGION: 'us-east-1'
-  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPOSITORY: na-agents
 
 jobs:
@@ -137,7 +136,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -159,7 +158,7 @@ jobs:
       - name: Run Trivy vulnerability scanner on image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-image-results.sarif'
 
@@ -195,7 +194,7 @@ jobs:
           chmod +x deploy-to-aws.sh
           
           # Set environment variables
-          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_DEV }}
           export IMAGE_TAG=${{ github.sha }}
           
           # Run deployment
@@ -309,7 +308,7 @@ jobs:
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
-          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_STG }}
           export IMAGE_TAG=${{ github.sha }}
           ./deploy-to-aws.sh stg
           
@@ -367,7 +366,7 @@ jobs:
         id: deploy
         run: |
           chmod +x deploy-to-aws.sh
-          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}
+          export AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_PRD }}
           export IMAGE_TAG=${{ github.sha }}
           ./deploy-to-aws.sh prd
           
@@ -414,17 +413,29 @@ jobs:
       - name: Cleanup old ECR images
         run: |
           echo "Cleaning up old ECR images..."
+          # Determine which account's ECR to clean based on last deployment
+          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
+            ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_PRD }}
+          elif [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_STG }}
+          else
+            ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID_DEV }}
+          fi
+          
+          # Note: ECR cleanup requires the registry to be in the same account
+          # as the current AWS credentials. This will only work if deploying
+          # within the same account.
           aws ecr describe-images \
             --repository-name ${{ env.ECR_REPOSITORY }} \
             --query 'sort_by(imageDetails,&imagePushedAt)[:-10].[imageDigest]' \
-            --output text | \
+            --output text 2>/dev/null | \
           while read digest; do
             if [ ! -z "$digest" ]; then
               aws ecr batch-delete-image \
                 --repository-name ${{ env.ECR_REPOSITORY }} \
                 --image-ids imageDigest=$digest || true
             fi
-          done
+          done || echo "ECR cleanup skipped (may be cross-account)"
 
   # Notification
   notify:
